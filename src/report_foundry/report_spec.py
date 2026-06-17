@@ -315,7 +315,8 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     layout_metrics = analyze_pdf_layout(pdf_path)
     _assert_pdf_layout_quality(layout_metrics)
     layout_metrics_path.write_text(json.dumps(layout_metrics, indent=2), encoding="utf-8")
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, **visual_paths}
+    page_previews_dir = _write_pdf_page_previews(pdf_path, out_dir / f"{artifact_stem}.pages")
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, **visual_paths}
 
 
 def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:
@@ -356,6 +357,17 @@ def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:
         "creator": document.metadata.get("creator") or "",
         "pages": page_metrics,
     }
+
+
+def _write_pdf_page_previews(pdf_path: Path, previews_dir: Path) -> Path:
+    import fitz
+
+    previews_dir.mkdir(parents=True, exist_ok=True)
+    document = fitz.open(pdf_path)
+    for index, page in enumerate(document, 1):
+        pixmap = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5), alpha=False)
+        pixmap.save(previews_dir / f"page_{index:03d}.png")
+    return previews_dir
 
 
 def _assert_pdf_layout_quality(metrics: dict[str, object]) -> None:

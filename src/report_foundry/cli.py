@@ -18,6 +18,7 @@ from .qa import run_quality_gates
 from .research import write_research_artifacts
 from .render import render_html, render_pdf
 from .report_spec import write_spec_artifacts
+from .samples import write_oss_strategy_report
 
 app = typer.Typer(help="AI-native evidence-to-PDF report compiler.")
 
@@ -63,6 +64,21 @@ def compile_spec(input: Path, out_dir: Path = Path(".output_spec")) -> None:
     print(f"[green]report spec[/green] {paths['spec']}")
     print(f"[green]built[/green] {paths['html']}")
     print(f"[green]built[/green] {paths['pdf']}")
+
+
+@app.command("oss-strategy-report")
+def oss_strategy_report(
+    out_dir: Path = Path(".output_oss_strategy"),
+    offline: bool = typer.Option(False, help="Use packaged repository metadata instead of live GitHub API calls."),
+) -> None:
+    """Build the canonical OSS strategy sample through the full foundry pipeline."""
+    paths = write_oss_strategy_report(out_dir, offline=offline)
+    print(f"[green]evidence pack[/green] {paths['evidence_pack']}")
+    print(f"[green]report spec[/green] {paths['spec']}")
+    print(f"[green]built[/green] {paths['html']}")
+    print(f"[green]built[/green] {paths['pdf']}")
+    print(f"[green]layout metrics[/green] {paths['layout_metrics']}")
+    print(f"[green]page previews[/green] {paths['page_previews']}")
 
 
 @app.command()

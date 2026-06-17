@@ -198,10 +198,11 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics"}
-    for path in paths.values():
-        assert path.exists(), path
-        assert path.stat().st_size > 0, path
+    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews"}
+    for key, path in paths.items():
+        assert path.exists(), (key, path)
+        if path.is_file():
+            assert path.stat().st_size > 0, path
     assert paths["evidence_trace_map"].suffix == ".svg"
     assert "<svg" in paths["evidence_trace_map"].read_text(encoding="utf-8")
     assert paths["pdf"].read_bytes().startswith(b"%PDF")
@@ -212,6 +213,7 @@ def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path
     assert layout["visual_object_count"] >= 1
     assert layout["producer"] == "Skia/PDF"
     assert layout["average_words_per_page"] > 0
+    assert (paths["page_previews"] / "page_001.png").exists()
     spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
     assert spec["tool_routes"]["pdf"] == "playwright_chromium"
     assert spec["source_appendix"]["headers"] == ["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"]
@@ -238,4 +240,24 @@ def test_compile_spec_command_builds_pdf_from_evidence_pack(tmp_path: Path) -> N
     assert "report spec" in result.output
     assert (out_dir / "evidence_pack.spec.json").exists()
     assert (out_dir / "evidence_pack.pdf").exists()
+    assert (out_dir / "evidence_pack.layout.json").exists()
     assert (out_dir / "evidence_pack.pdf").read_bytes().startswith(b"%PDF")
+
+
+def test_oss_strategy_command_codes_the_full_sample_workflow(tmp_path: Path) -> None:
+    out_dir = tmp_path / "oss_strategy"
+
+    result = runner.invoke(app, ["oss-strategy-report", "--out-dir", str(out_dir), "--offline"])
+
+    assert result.exit_code == 0, result.output
+    assert "evidence pack" in result.output
+    assert "layout metrics" in result.output
+    assert (out_dir / "oss_strategy_evidence_pack.json").exists()
+    assert (out_dir / "oss_strategy_evidence_pack.spec.json").exists()
+    assert (out_dir / "oss_strategy_evidence_pack.html").exists()
+    assert (out_dir / "oss_strategy_evidence_pack.pdf").exists()
+    assert (out_dir / "oss_strategy_evidence_pack.layout.json").exists()
+    assert (out_dir / "oss_strategy_evidence_pack.pages" / "page_001.png").exists()
+    layout = json.loads((out_dir / "oss_strategy_evidence_pack.layout.json").read_text(encoding="utf-8"))
+    assert layout["producer"] == "Skia/PDF"
+    assert layout["average_words_per_page"] >= 180
