@@ -9,6 +9,7 @@ from rich import print
 from .factory import write_run_package
 from .ir import Report
 from .qa import run_quality_gates
+from .research import write_research_artifacts
 from .render import render_html, render_pdf
 
 app = typer.Typer(help="AI-native evidence-to-PDF report compiler.")
@@ -35,6 +36,16 @@ def plan_run(
     )
     print(f"[green]factory run package[/green] {package.run_dir}")
     print(f"route_back={package.initial_gate_result.route_back_department or 'none'} score={package.initial_gate_result.score}")
+
+
+@app.command("research-run")
+def research_run(run_dir: Path, source_dir: Path = typer.Option(..., help="Directory containing .md/.txt marked source files.")) -> None:
+    """Extract evidence from local marked sources into a factory run package."""
+    result = write_research_artifacts(run_dir=run_dir, source_dir=source_dir)
+    print(f"[green]research evidence[/green] {run_dir / 'evidence_pack.json'}")
+    print(f"route_back={result.gate_result.route_back_department or 'none'} score={result.gate_result.score}")
+    if not result.gate_result.ok:
+        raise typer.Exit(1)
 
 
 @app.command()

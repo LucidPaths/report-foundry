@@ -53,6 +53,8 @@
 - [x] source-plan artifact with primary/trusted source quotas per required dimension
 - [x] visual-plan artifact with chart/map/diagram/image provenance requirements
 - [x] `reportfoundry plan-run` CLI that persists manifest, rubric, source plan, visual plan, and initial gate result
+- [x] `reportfoundry research-run` CLI that normalizes local marked source files into evidence packs and research gate results
+- [x] fail-closed research extraction: missing `DIMENSION:` markers route back to Research
 - [ ] final AI reviewer rubric that reads/looks at generated PDF screenshots and scores against the initial case rubric
 - [ ] iterative department retry loop: failed gate returns the artifact to the responsible department with repair instructions
 

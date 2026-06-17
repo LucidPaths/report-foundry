@@ -10,9 +10,9 @@ Report Foundry turns structured evidence packs into beautiful, grounded reports 
 - Quality gates: unsupported claims, missing alt text warnings, ragged tables
 - HTML renderer for preview/share
 - Real PDF renderer via ReportLab
-- CLI: `reportfoundry validate`, `reportfoundry build`, and `reportfoundry plan-run`
+- CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and `reportfoundry research-run`
 - Example report fixture
-- Analyst-factory planning contracts: case rubric, source plan, visual plan, initial gate routing
+- Analyst-factory contracts: case rubric, source plan, visual plan, local marked-source research, gate routing
 
 ## Quick start
 
@@ -51,6 +51,29 @@ Outputs:
 - `initial_gate_result.json` — fail-closed route-back result. A new run with no observed evidence should route to Research.
 
 This is a planning package, not a completed deep-research report. Research/connectors must satisfy the source plan before synthesis/rendering can ship.
+
+### Local marked-source research
+
+Create an evidence pack from local `.md`/`.txt` files whose claims are explicitly marked against the source plan:
+
+```bash
+uv run reportfoundry research-run .factory-run/spacex-ipo \
+  --source-dir ./marked-sources
+```
+
+Marked source format:
+
+```text
+DIMENSION: starlink_economics
+Starlink economics depends on subscriber and revenue scale because recurring broadband cash flow creates the strongest public-market proof point; 2026 disclosures matter.
+```
+
+Outputs:
+
+- `evidence_pack.json` — observed local source records with SHA-256 hashes, extracted dimension facts, and source-bound claims.
+- `research_gate_result.json` — factory gate result after research coverage. Missing dimension markers route back to Research.
+
+This mode is deterministic and local. It does not discover web sources or claim live facts by itself; it only normalizes marked source files into the evidence contract.
 
 ## Ollama Cloud newsletter path
 
