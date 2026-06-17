@@ -44,3 +44,21 @@
 - [ ] evidence graph
 - [ ] source appendix generator
 - [ ] Discord publisher
+
+## v0.6 Analyst factory gates
+
+- [x] first `factory` schema for departments, run manifest, case rubric, page metrics, and gate results
+- [x] deterministic seed rubrics for SpaceX IPO and European banking examples
+- [x] route-back gates for missing research dimensions, vague claims, underfilled pages, and missing source appendix
+- [ ] source-plan artifact with primary/trusted source quotas per required dimension
+- [ ] visual-plan artifact with chart/map/diagram/image provenance requirements
+- [ ] final AI reviewer rubric that reads/looks at generated PDF screenshots and scores against the initial case rubric
+- [ ] iterative department retry loop: failed gate returns the artifact to the responsible department with repair instructions
+
+## v0.7 Enterprise/MCP deployment
+
+- [ ] MCP server exposing topic intake, source ingestion, evidence validation, render, QA, and artifact retrieval tools
+- [ ] connector interface for company databases, document stores, APIs, and internal MCP tools
+- [ ] server/queue runner for department workers and audit logs
+- [ ] per-tenant source trust policy and connector allowlist
+- [ ] artifact package export: PDF, HTML, source appendix, evidence JSON, QA report, and run manifest
