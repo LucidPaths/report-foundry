@@ -27,7 +27,7 @@ def render_html(report: Report) -> str:
         "h1{font-size:42px;margin-bottom:4px}.subtitle{color:#667085;font-size:18px}.section{page-break-before:always;margin-top:48px}"
         ".metric{display:inline-block;border:1px solid #d0d5dd;border-radius:16px;padding:16px 20px;margin:8px;background:#f9fafb}"
         ".metric strong{font-size:28px;display:block}.claim{border-left:4px solid #7c3aed;padding:12px 16px;background:#f5f3ff;margin:16px 0}"
-        ".citation{font-size:12px;color:#475467}.figure{border:1px dashed #98a2b3;border-radius:16px;padding:18px;margin:18px 0;color:#475467}"
+        ".citation{font-size:12px;color:#475467;margin-top:8px}.source-url{font-size:11px;word-break:break-all;color:#2563eb}.figure{border:1px dashed #98a2b3;border-radius:16px;padding:18px;margin:18px 0;color:#475467}"
         "table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #d0d5dd;padding:8px;text-align:left}</style></head><body><main>",
         f"<h1>{escape(report.title)}</h1>",
     ]
@@ -49,7 +49,9 @@ def render_html(report: Report) -> str:
                     label = escape(c.title or c.source_id)
                     url = escape(c.url or "")
                     quote = escape(c.quote or "")
-                    parts.append(f"<div class='citation'><a href='{url}'>{label}</a> — {quote}</div>")
+                    locator = escape(c.locator or "")
+                    link = f"<a href='{url}'>{label}</a><div class='source-url'>{url}</div>" if url else label
+                    parts.append(f"<div class='citation'>{link}<div>{quote}</div><div>Evidence: {locator}</div></div>")
                 parts.append("</div>")
             elif isinstance(block, Figure):
                 image = f"<img src='{escape(block.path)}' alt='{escape(block.alt_text or block.title)}' style='max-width:100%;border-radius:12px;border:1px solid #d0d5dd'>" if block.path else ""

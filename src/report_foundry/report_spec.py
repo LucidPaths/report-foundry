@@ -37,7 +37,7 @@ class SpecClaim(BaseModel):
 
 
 class SpecBlock(BaseModel):
-    role: Literal["text", "claim", "table", "visual"]
+    role: Literal["text", "paragraph", "claim", "table", "visual"]
     content: str
     fact_ids: list[str] = Field(default_factory=list)
 
@@ -45,9 +45,19 @@ class SpecBlock(BaseModel):
 class SpecSection(BaseModel):
     section_id: str
     title: str
-    role: Literal["scope", "evidence", "analysis", "visual", "appendix"]
+    role: Literal["scope", "evidence", "analysis", "report", "visual", "appendix"]
     blocks: list[SpecBlock]
     claims: list[SpecClaim] = Field(default_factory=list)
+
+
+class SpecFact(BaseModel):
+    fact_id: str
+    subject: str
+    predicate: str
+    value: str
+    source_id: str
+    quote: str
+    locator: str | None = None
 
 
 class SpecVisual(BaseModel):
@@ -81,6 +91,7 @@ class ReportSpec(BaseModel):
     visuals: list[SpecVisual]
     source_appendix: SourceAppendix
     source_fact_map: dict[str, list[str]]
+    fact_details: dict[str, SpecFact]
 
 
 def compile_report_spec(pack: EvidencePack) -> ReportSpec:
@@ -91,16 +102,40 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
         for index, claim in enumerate(pack.claims)
     ]
     scope_lines = [f"{key}: {_stringify(value)}" for key, value in pack.scope.items()]
-    evidence_rows = [[fact.subject, fact.predicate, fact.value, fact.fact_id] for fact in pack.facts]
     source_rows = [
-        [source.source_id, source.title, source.observed_at, source.content_sha256[:16] + "…", source.extractor]
+        [source.source_id, source.title, source.url or "", source.observed_at, source.content_sha256[:16] + "…", source.extractor]
         for source in pack.sources
     ]
+    report_sections = [
+        SpecSection(
+            section_id=section.section_id,
+            title=section.title,
+            role="report",
+            blocks=[SpecBlock(role="paragraph", content=paragraph, fact_ids=section.fact_ids) for paragraph in section.paragraphs],
+        )
+        for section in pack.report_sections
+    ]
+    if not report_sections:
+        report_sections = [
+            SpecSection(
+                section_id="executive_brief",
+                title="Executive brief",
+                role="report",
+                blocks=[
+                    SpecBlock(
+                        role="paragraph",
+                        content="This report pack contains sourced claims but no full narrative sections. Add report_sections to the EvidencePack so the foundry can render an actual analyst report instead of schema plumbing.",
+                        fact_ids=list(facts_by_id),
+                    )
+                ],
+            )
+        ]
     return ReportSpec(
         title=pack.title,
         subtitle=pack.subtitle,
         audience=str(pack.scope.get("audience", "executive readers")),
         sections=[
+            *report_sections,
             SpecSection(
                 section_id="scope",
                 title="Scope",
@@ -131,8 +166,9 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
                 plain_text_payload=_evidence_map_payload(pack),
             )
         ],
-        source_appendix=SourceAppendix(headers=["Source", "Title", "Observed", "SHA-256", "Extractor"], rows=source_rows),
+        source_appendix=SourceAppendix(headers=["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"], rows=source_rows),
         source_fact_map={source.source_id: [fact.fact_id for fact in pack.facts if fact.source_id == source.source_id] for source in pack.sources},
+        fact_details={fact.fact_id: SpecFact(**fact.model_dump()) for fact in pack.facts},
     )
 
 
@@ -140,8 +176,16 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
     visual_paths = visual_paths or {}
     sections: list[Section] = []
     for section in spec.sections:
-        if section.section_id == "scope":
-            sections.append(Section(title=section.title, kicker="Typed report boundary before claims.", blocks=[TextBlock(text=section.blocks[0].content)]))
+        if section.role == "report":
+            sections.append(
+                Section(
+                    title=section.title,
+                    kicker=None,
+                    blocks=[TextBlock(text=block.content) for block in section.blocks if block.role == "paragraph"],
+                )
+            )
+        elif section.section_id == "scope":
+            continue
         elif section.section_id == "evidence_claims":
             sections.append(
                 Section(
@@ -159,13 +203,7 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
                 )
             )
         elif section.section_id == "fact_table":
-            sections.append(
-                Section(
-                    title=section.title,
-                    kicker="Renderer/tool payload receives explicit data, not vague instructions.",
-                    blocks=[TableBlock(headers=["Source", "Fact IDs"], rows=[[source_id, "; ".join(fact_ids)] for source_id, fact_ids in spec.source_fact_map.items()])],
-                )
-            )
+            continue
     sections.append(
         Section(
             title="Visual Contract",
@@ -279,11 +317,22 @@ def _ensure_valid_evidence(pack: EvidencePack) -> None:
 
 def _citations_for_claim(spec: ReportSpec, claim: SpecClaim) -> list[Citation]:
     citations: list[Citation] = []
+    claim_fact_ids = set(claim.fact_ids)
     for source_row in spec.source_appendix.rows:
         source_id = source_row[0]
-        fact_ids = set(spec.source_fact_map.get(source_id, []))
-        if fact_ids.intersection(claim.fact_ids):
-            citations.append(Citation(source_id=source_id, title=source_row[1], quote="facts: " + ", ".join(claim.fact_ids), accessed_at=source_row[2], locator="ReportSpec source_fact_map"))
+        source_fact_ids = [fact_id for fact_id in spec.source_fact_map.get(source_id, []) if fact_id in claim_fact_ids]
+        if source_fact_ids:
+            quotes = [spec.fact_details[fact_id].quote for fact_id in source_fact_ids if fact_id in spec.fact_details]
+            citations.append(
+                Citation(
+                    source_id=source_id,
+                    title=source_row[1],
+                    url=source_row[2],
+                    quote="; ".join(quotes),
+                    accessed_at=source_row[3],
+                    locator="; ".join(source_fact_ids),
+                )
+            )
     return citations
 
 

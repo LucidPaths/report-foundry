@@ -11,7 +11,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from report_foundry.cli import app
-from report_foundry.evidence import EvidenceClaim, EvidenceFact, EvidencePack, SourceObservation
+from report_foundry.evidence import EvidenceClaim, EvidenceFact, EvidencePack, ReportNarrativeSection, SourceObservation
 from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts
 
 runner = CliRunner()
@@ -66,6 +66,18 @@ def make_evidence_pack() -> EvidencePack:
         sources=[source],
         facts=facts,
         claims=claims,
+        report_sections=[
+            ReportNarrativeSection(
+                section_id="analyst_context",
+                title="Analyst context",
+                kicker="Plain report prose authored upstream.",
+                paragraphs=[
+                    "This is a full narrative paragraph, not schema debris. It explains why Starlink economics and launch cadence are separate IPO-readiness gates.",
+                    "The foundry must render this prose as report content while keeping citations, source links, and evidence maps attached as supporting material.",
+                ],
+                fact_ids=["fact_starlink", "fact_launch"],
+            )
+        ],
         tags=["spec-fixture"],
     )
 
@@ -77,7 +89,10 @@ def test_compile_report_spec_is_strict_tool_feed() -> None:
     assert spec.render_targets == ["html", "pdf"]
     assert spec.tool_routes["pdf"] == "playwright_chromium"
     assert spec.tool_routes["html"] == "html_css"
-    assert len(spec.sections) >= 3
+    assert len(spec.sections) >= 4
+    assert spec.sections[0].role == "report"
+    assert spec.sections[0].blocks[0].role == "paragraph"
+    assert "full narrative paragraph" in spec.sections[0].blocks[0].content
     assert all(section.blocks for section in spec.sections)
     assert all(claim.fact_ids for section in spec.sections for claim in section.claims)
     assert spec.visuals[0].provenance_fact_ids == ["fact_starlink", "fact_launch"]
@@ -92,7 +107,10 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
     claims = report.claims()
     assert len(claims) == 2
     assert claims[0].citations[0].source_id == "src_spacex_registry"
-    assert any(section.title == "Source Appendix" for section in report.sections)
+    assert claims[0].citations[0].url == "https://example.test/spacex-registry"
+    assert "Starlink economics depends" in (claims[0].citations[0].quote or "")
+    assert report.sections[0].title == "Analyst context"
+    assert any("full narrative paragraph" in block.text for block in report.sections[0].blocks if block.type == "text")
     assert any(block.type == "figure" and "source-backed" in (block.caption or "") for section in report.sections for block in section.blocks)
 
 
@@ -110,6 +128,8 @@ def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path
     assert b"Skia/PDF" in paths["pdf"].read_bytes()
     spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
     assert spec["tool_routes"]["pdf"] == "playwright_chromium"
+    assert spec["source_appendix"]["headers"] == ["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"]
+    assert spec["source_appendix"]["rows"][0][2] == "https://example.test/spacex-registry"
 
 
 def test_compile_spec_command_builds_pdf_from_evidence_pack(tmp_path: Path) -> None:

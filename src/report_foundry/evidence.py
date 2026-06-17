@@ -62,6 +62,23 @@ class EvidenceClaim(BaseModel):
     confidence: Confidence = "unknown"
 
 
+class ReportNarrativeSection(BaseModel):
+    """Plain-language report prose produced upstream and rendered by the foundry."""
+
+    section_id: str
+    title: str
+    kicker: str | None = None
+    paragraphs: list[str]
+    fact_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("paragraphs")
+    @classmethod
+    def paragraphs_required(cls, value: list[str]) -> list[str]:
+        if not value or not any(item.strip() for item in value):
+            raise ValueError("report narrative sections must contain prose paragraphs")
+        return value
+
+
 class EvidencePack(BaseModel):
     title: str
     subtitle: str | None = None
@@ -71,6 +88,7 @@ class EvidencePack(BaseModel):
     sources: list[SourceObservation] = Field(default_factory=list)
     facts: list[EvidenceFact] = Field(default_factory=list)
     claims: list[EvidenceClaim] = Field(default_factory=list)
+    report_sections: list[ReportNarrativeSection] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -113,6 +131,17 @@ def validate_evidence_pack(pack: EvidencePack) -> QualityResult:
                         code="missing_fact",
                         message=f"Claim references unknown fact {fact_id}.",
                         location=f"claims[{claim_index}].fact_ids",
+                    )
+                )
+
+    for section_index, section in enumerate(pack.report_sections):
+        for fact_id in section.fact_ids:
+            if fact_id not in fact_ids:
+                checks.append(
+                    QualityCheck(
+                        code="missing_fact",
+                        message=f"Narrative section references unknown fact {fact_id}.",
+                        location=f"report_sections[{section_index}].fact_ids",
                     )
                 )
 
