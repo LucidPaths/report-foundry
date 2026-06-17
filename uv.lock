@@ -867,6 +867,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
+    { name = "pillow" },
     { name = "pydantic" },
     { name = "reportlab" },
     { name = "rich" },
@@ -889,6 +890,7 @@ weasy = [
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "kaleido", marker = "extra == 'charts'", specifier = ">=1.0" },
+    { name = "pillow", specifier = ">=10.0" },
     { name = "plotly", marker = "extra == 'charts'", specifier = ">=6.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
