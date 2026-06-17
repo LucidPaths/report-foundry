@@ -9,10 +9,12 @@
 - [x] Quality gates
 - [x] CLI build/validate
 - [x] Example report
+- [x] Ollama Cloud evidence-pack newsletter with designed HTML/PDF output
 
 ## v0.2 Evidence packs
 
-- [ ] `manifest.json` schema
+- [x] first evidence-pack sidecar for Ollama Cloud newsletter
+- [ ] formal `manifest.json` schema
 - [ ] content-addressed source cache
 - [ ] source hashing and access timestamps
 - [ ] provenance sidecar export
@@ -20,7 +22,8 @@
 
 ## v0.3 Visual system
 
-- [ ] theme tokens
+- [x] first deterministic newsletter layout with model cards and benchmark bars
+- [ ] reusable theme tokens
 - [ ] section divider components
 - [ ] Plotly/Vega chart adapters
 - [ ] Mermaid diagram adapter

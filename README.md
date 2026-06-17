@@ -30,17 +30,24 @@ Outputs:
 
 ## Ollama Cloud newsletter path
 
-Generate a live model brief from Ollama Cloud, then render it through Report Foundry:
+Generate a live model brief from Ollama Cloud. The script now writes a structured evidence pack, semantic IR, designed HTML preview, deterministic PDF, and Discord-ready attachment message:
 
 ```bash
-python scripts/ollama_daily_newsletter.py \
-  --out .output/ollama_cloud_field_brief.json \
-  --discord-md .output/ollama_cloud_field_brief.discord.md
+uv run python scripts/ollama_daily_newsletter.py --out-dir .output
 uv run reportfoundry validate .output/ollama_cloud_field_brief.json
-uv run reportfoundry build .output/ollama_cloud_field_brief.json --out-dir .output
 ```
 
 The script expects `OLLAMA_API_KEY` in the environment or in the local Hermes `.env`. It does not print the key.
+
+Outputs:
+
+- `.output/ollama_cloud_field_brief.evidence.json` — scope, live checks, sources, benchmark metrics, toolchain, layout contract.
+- `.output/ollama_cloud_field_brief.json` — Report Foundry IR for generic validation/rendering.
+- `.output/ollama_cloud_field_brief_designed.html` — newsletter preview.
+- `.output/ollama_cloud_field_brief_designed.pdf` — polished PDF artifact with scope, pipeline, model cards, benchmark bars, and source footer.
+- `.output/ollama_cloud_field_brief_designed.discord.md` — sanitized Discord message with PDF attachment path.
+
+Contract: the LLM is allowed to generate bounded commentary only. It does not choose report scope, sources, layout, charts, citations, or PDF structure.
 
 ## Design direction
 

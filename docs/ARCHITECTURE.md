@@ -8,10 +8,22 @@ Report Foundry is an AI-native publication compiler. The model produces structur
 sources -> evidence pack -> semantic IR -> assets/charts -> HTML/PDF renderers -> QA -> delivery
 ```
 
+The Ollama Cloud newsletter path implements the contract explicitly:
+
+```text
+Ollama /v1/models + benchmark/model-card sources
+  -> evidence pack (scope, source IDs, model metrics, toolchain, layout contract)
+  -> bounded LLM commentary (short notes only)
+  -> semantic IR for QA
+  -> deterministic designed HTML/PDF renderers
+  -> sanitized Discord message
+```
+
 ## Principles
 
 - PDF is an artifact, not the source of truth.
 - Claims carry citations at span/block level.
+- LLMs may write bounded prose, but must not own scope, source selection, citations, charts, or layout.
 - Renderers are adapters: ReportLab now, WeasyPrint/PrinceXML/Typst/Playwright later.
 - Charts and diagrams should be SVG/vector-first.
 - External assets require cached hashes, license metadata, alt text, and attribution.
