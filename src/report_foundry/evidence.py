@@ -142,6 +142,25 @@ class ProfessionalReportContent(BaseModel):
         return value
 
 
+class DraftExhibit(BaseModel):
+    """Visual intent selected by the LLM/report writer and rendered by adapters."""
+
+    visual_id: str
+    visual_type: Literal["evidence_map", "chart", "matrix", "timeline", "diagram"] = "diagram"
+    title: str | None = None
+    purpose: str
+    preferred_tool: Literal["mermaid", "vega_lite", "typst", "html_css"] = "mermaid"
+    provenance_fact_ids: list[str]
+    plain_text_payload: str
+
+    @field_validator("provenance_fact_ids")
+    @classmethod
+    def exhibit_provenance_required(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("draft exhibits require source-backed fact IDs")
+        return value
+
+
 class EvidencePack(BaseModel):
     title: str
     subtitle: str | None = None
@@ -153,6 +172,7 @@ class EvidencePack(BaseModel):
     claims: list[EvidenceClaim] = Field(default_factory=list)
     report_sections: list[ReportNarrativeSection] = Field(default_factory=list)
     professional_report: ProfessionalReportContent | None = None
+    exhibits: list[DraftExhibit] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -230,6 +250,17 @@ def validate_evidence_pack(pack: EvidencePack) -> QualityResult:
                             location=f"professional_report.sections[{section_index}].fact_ids",
                         )
                     )
+
+    for exhibit_index, exhibit in enumerate(pack.exhibits):
+        for fact_id in exhibit.provenance_fact_ids:
+            if fact_id not in fact_ids:
+                checks.append(
+                    QualityCheck(
+                        code="missing_fact",
+                        message=f"Draft exhibit references unknown fact {fact_id}.",
+                        location=f"exhibits[{exhibit_index}].provenance_fact_ids",
+                    )
+                )
 
     return QualityResult(ok=not any(check.severity == "error" for check in checks), checks=checks)
 

@@ -11,6 +11,7 @@ from pathlib import Path
 import typer
 from rich import print
 
+from .draft import parse_markdown_draft_file
 from .factory import write_run_package
 from .ir import Report
 from .evidence import EvidencePack
@@ -54,6 +55,26 @@ def research_run(run_dir: Path, source_dir: Path = typer.Option(..., help="Direc
     print(f"route_back={result.gate_result.route_back_department or 'none'} score={result.gate_result.score}")
     if not result.gate_result.ok:
         raise typer.Exit(1)
+
+
+@app.command("compile-draft")
+def compile_draft(
+    input: Path,
+    out_dir: Path = Path(".output_draft"),
+    author: str = typer.Option("Research LLM", help="Author label stored in the generated EvidencePack."),
+) -> None:
+    """Compile an LLM-authored Markdown draft into Foundry artifacts."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    pack = parse_markdown_draft_file(input, author=author)
+    evidence_path = out_dir / f"{input.stem}.evidence.json"
+    evidence_path.write_text(pack.model_dump_json(indent=2), encoding="utf-8")
+    paths = write_spec_artifacts(pack, out_dir, stem=input.stem)
+    print(f"[green]evidence pack[/green] {evidence_path}")
+    print(f"[green]report spec[/green] {paths['spec']}")
+    print(f"[green]built[/green] {paths['html']}")
+    print(f"[green]built[/green] {paths['pdf']}")
+    print(f"[green]layout metrics[/green] {paths['layout_metrics']}")
+    print(f"[green]page previews[/green] {paths['page_previews']}")
 
 
 @app.command("compile-spec")

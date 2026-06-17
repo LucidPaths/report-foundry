@@ -40,7 +40,7 @@ def render_html(report: Report) -> str:
         "main{max-width:1080px;margin:0 auto;background:#fffffff2;min-height:100vh;padding:28px 34px;border-left:1px solid #ffffff66;border-right:1px solid #ffffff66}"
         "header.cover{display:grid;grid-template-columns:1.6fr .8fr;gap:24px;align-items:end;border-bottom:3px solid var(--ink);padding:22px 0 18px;margin-bottom:16px}"
         "h1{font-size:40px;line-height:1.02;margin:0 0 8px}.subtitle{color:var(--muted);font-size:15px;line-height:1.35}.dateline{font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.08em}"
-        ".section{break-inside:avoid;margin:16px 0;padding:14px 0;border-top:1px solid #e4e7ec}.section h2{font-size:22px;line-height:1.1;margin:0 0 8px}"
+        ".section{break-inside:auto;margin:16px 0;padding:14px 0;border-top:1px solid #e4e7ec}.section h2{font-size:22px;line-height:1.1;margin:0 0 8px}"
         ".section:nth-of-type(n+3):not(:has(table)):not(:has(figure)){display:grid;grid-template-columns:.34fr 1fr;gap:18px;align-items:start}.section:nth-of-type(n+3) h2{font-size:18px}.section:nth-of-type(n+3) .section-body{columns:2;column-gap:22px}"
         "p{font-size:12.5px;line-height:1.42;margin:0 0 8px}ul{margin:4px 0 8px 18px;padding:0}li{font-size:12.5px;line-height:1.38;margin:0 0 4px}"
         ".metric{display:inline-block;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin:6px;background:#f9fafb}.metric strong{font-size:24px;display:block}"

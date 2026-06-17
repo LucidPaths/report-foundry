@@ -221,6 +221,17 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
             ),
         ],
         visuals=[
+            *[
+                SpecVisual(
+                    visual_id=exhibit.visual_id,
+                    visual_type=exhibit.visual_type,
+                    purpose=exhibit.purpose,
+                    preferred_tool=exhibit.preferred_tool,
+                    provenance_fact_ids=exhibit.provenance_fact_ids,
+                    plain_text_payload=exhibit.plain_text_payload,
+                )
+                for exhibit in pack.exhibits
+            ],
             SpecVisual(
                 visual_id="evidence_trace_map",
                 visual_type="evidence_map",
@@ -228,7 +239,7 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
                 preferred_tool="mermaid",
                 provenance_fact_ids=list(facts_by_id),
                 plain_text_payload=_evidence_map_payload(pack),
-            )
+            ),
         ],
         source_appendix=SourceAppendix(headers=["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"], rows=source_rows),
         source_fact_map={source.source_id: [fact.fact_id for fact in pack.facts if fact.source_id == source.source_id] for source in pack.sources},
@@ -286,8 +297,15 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
     sections.append(
         Section(
             title="Source Appendix",
-            kicker="Observed payloads and hashes used by this artifact.",
-            blocks=[TableBlock(headers=spec.source_appendix.headers, rows=spec.source_appendix.rows)],
+            kicker="Reader-facing source links; full hashes stay in the ReportSpec JSON.",
+            blocks=[
+                TextBlock(
+                    text="\n".join(
+                        f"• {row[1]} — {row[2] or row[0]} ({row[0]}, observed {row[3]})"
+                        for row in spec.source_appendix.rows
+                    )
+                )
+            ],
         )
     )
     return Report(title=spec.title, subtitle=spec.subtitle, sections=sections, tags=["report-spec", *spec.render_targets])
@@ -408,6 +426,9 @@ def _render_mermaid_svg(source_path: Path, output_path: Path) -> None:
 
 
 def _mermaid_payload(visual: SpecVisual) -> str:
+    payload = visual.plain_text_payload.strip()
+    if payload.startswith(("flowchart", "graph", "sequenceDiagram", "classDiagram", "stateDiagram", "timeline", "mindmap", "erDiagram")):
+        return payload + "\n"
     lines = ["flowchart LR"]
     for row in [line for line in visual.plain_text_payload.splitlines()[1:] if "->" in line]:
         parts = [part.strip() for part in row.split("->")]
