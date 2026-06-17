@@ -1,3 +1,8 @@
+"""Foundry intake tests for provider/key-reference contracts.
+
+Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P7 Secrets Stay Handles.
+"""
+
 from __future__ import annotations
 
 import pytest

@@ -1,3 +1,8 @@
+"""CLI contract tests for factory planning and fixture research.
+
+Lattice: RF-P4 Gates Fail Closed; RF-P8 Low Floor, High Ceiling.
+"""
+
 from __future__ import annotations
 
 import json

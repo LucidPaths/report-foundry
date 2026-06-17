@@ -43,6 +43,21 @@ Ollama /v1/models + benchmark/model-card sources
   -> sanitized Discord message
 ```
 
+## Principle lattice
+
+The Report Foundry doctrine is [`docs/PRINCIPLE_LATTICE.md`](PRINCIPLE_LATTICE.md). Each Python source/script/test file carries `Lattice:` notation in its file description so code can be reviewed against the principle it claims to instantiate.
+
+The eight principles are:
+
+1. **RF-P1 Source Sovereignty** — source observations are the root of truth.
+2. **RF-P2 Claim Traceability** — no orphan claims; every assertion has chain of custody.
+3. **RF-P3 Provider and Renderer Agnosticism** — interfaces survive adapter swaps.
+4. **RF-P4 Gates Fail Closed** — missing proof routes backward instead of shipping forward.
+5. **RF-P5 Case Law Before Generation** — rubric/scope exist before prose.
+6. **RF-P6 Visuals Are Claims** — charts/maps/matrices/timelines need provenance.
+7. **RF-P7 Secrets Stay Handles** — keys connect capabilities but never become artifacts.
+8. **RF-P8 Low Floor, High Ceiling** — simple commands, inspectable internals.
+
 ## Principles
 
 - PDF is an artifact, not the source of truth.

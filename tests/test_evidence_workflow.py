@@ -1,3 +1,8 @@
+"""Evidence workflow tests proving source-to-claim lineage.
+
+Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed.
+"""
+
 from __future__ import annotations
 
 import pytest

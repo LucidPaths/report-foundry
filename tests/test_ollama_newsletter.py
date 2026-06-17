@@ -1,3 +1,8 @@
+"""Ollama newsletter artifact tests for evidence, QA, PDF, and sanitized delivery.
+
+Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed; RF-P6 Visuals Are Claims; RF-P7 Secrets Stay Handles.
+"""
+
 from __future__ import annotations
 
 import importlib.util

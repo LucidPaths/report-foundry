@@ -1,3 +1,8 @@
+"""Report-level quality gates for admissible artifacts.
+
+Lattice: RF-P2 Claim Traceability; RF-P4 Gates Fail Closed; RF-P6 Visuals Are Claims.
+"""
+
 from __future__ import annotations
 
 from pydantic import BaseModel

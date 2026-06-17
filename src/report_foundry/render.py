@@ -1,3 +1,8 @@
+"""HTML and PDF renderer adapters for the semantic report IR.
+
+Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P6 Visuals Are Claims; RF-P8 Low Floor, High Ceiling.
+"""
+
 from __future__ import annotations
 
 from html import escape

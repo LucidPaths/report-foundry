@@ -14,6 +14,8 @@ foundry builds the report package: rubric, facts, claims, visuals, layout, QA, e
 
 Report Foundry is the system that owns source law, evidence validation, gate routing, rendering, verification, and publishing. AI/search providers are connected capabilities; they are not the foundry.
 
+The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LATTICE.md). Python source, scripts, and tests declare their local doctrine with a `Lattice:` notation in the file description; the test suite fails if new Python files omit it.
+
 ## What exists now
 
 - Top-level foundry intake contract: keyword/topic plus user-connected AI/search provider references.

@@ -1,3 +1,8 @@
+"""Factory workflow tests for rubric, source plan, visual plan, and gate routing.
+
+Lattice: RF-P4 Gates Fail Closed; RF-P5 Case Law Before Generation; RF-P6 Visuals Are Claims.
+"""
+
 from __future__ import annotations
 
 from report_foundry.evidence import EvidenceClaim, EvidenceFact, EvidencePack, SourceObservation

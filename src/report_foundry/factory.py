@@ -1,3 +1,8 @@
+"""Analyst-factory contracts for rubrics, source plans, visual plans, and route-back gates.
+
+Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P4 Gates Fail Closed; RF-P5 Case Law Before Generation; RF-P6 Visuals Are Claims; RF-P7 Secrets Stay Handles.
+"""
+
 from __future__ import annotations
 
 from enum import Enum

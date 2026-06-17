@@ -1,3 +1,8 @@
+"""CLI surfaces for planning, fixture research, validation, and rendering.
+
+Lattice: RF-P4 Gates Fail Closed; RF-P8 Low Floor, High Ceiling.
+"""
+
 from __future__ import annotations
 
 import json

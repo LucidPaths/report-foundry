@@ -1,3 +1,8 @@
+"""Renderer adapter tests for HTML and PDF outputs from the semantic IR.
+
+Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P8 Low Floor, High Ceiling.
+"""
+
 from pathlib import Path
 
 from report_foundry.ir import Citation, Claim, Figure, MetricCard, Report, Section, TextBlock

@@ -1,3 +1,8 @@
+"""Quality-gate tests for unsupported claims, accessibility warnings, and table shape.
+
+Lattice: RF-P2 Claim Traceability; RF-P4 Gates Fail Closed; RF-P6 Visuals Are Claims.
+"""
+
 from report_foundry.ir import Claim, Report, Section
 from report_foundry.qa import run_quality_gates
 

@@ -1,3 +1,8 @@
+"""Semantic IR tests for claim/source traversal.
+
+Lattice: RF-P2 Claim Traceability; RF-P3 Provider and Renderer Agnosticism.
+"""
+
 from report_foundry.ir import Citation, Claim, Report, Section, TextBlock
 
 

@@ -1,3 +1,8 @@
+"""Evidence contracts for observed sources, extracted facts, and supported claims.
+
+Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed.
+"""
+
 from __future__ import annotations
 
 from datetime import date

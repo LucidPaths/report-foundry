@@ -1,3 +1,8 @@
+"""Renderer-neutral semantic report IR.
+
+Lattice: RF-P2 Claim Traceability; RF-P3 Provider and Renderer Agnosticism; RF-P8 Low Floor, High Ceiling.
+"""
+
 from __future__ import annotations
 
 from datetime import date
