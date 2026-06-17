@@ -6,6 +6,9 @@ Lattice: RF-P2 Claim Traceability; RF-P3 Provider and Renderer Agnosticism; RF-P
 from __future__ import annotations
 
 from pathlib import Path
+import re
+import shutil
+import subprocess
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -13,10 +16,10 @@ from pydantic import BaseModel, Field, field_validator
 from .evidence import EvidencePack, validate_evidence_pack
 from .ir import Citation, Claim, Figure, Report, Section, TableBlock, TextBlock
 from .qa import run_quality_gates
-from .render import render_html, render_pdf
+from .render import render_html, render_html_pdf_with_chromium
 
 RenderTarget = Literal["html", "pdf"]
-ToolRoute = Literal["html_css", "reportlab", "vega_lite", "mermaid", "typst"]
+ToolRoute = Literal["html_css", "playwright_chromium", "reportlab", "vega_lite", "mermaid", "typst"]
 
 
 class SpecClaim(BaseModel):
@@ -73,7 +76,7 @@ class ReportSpec(BaseModel):
     subtitle: str | None = None
     audience: str = "executive readers"
     render_targets: list[RenderTarget] = Field(default_factory=lambda: ["html", "pdf"])
-    tool_routes: dict[RenderTarget, ToolRoute] = Field(default_factory=lambda: {"html": "html_css", "pdf": "reportlab"})
+    tool_routes: dict[RenderTarget, ToolRoute] = Field(default_factory=lambda: {"html": "html_css", "pdf": "playwright_chromium"})
     sections: list[SpecSection]
     visuals: list[SpecVisual]
     source_appendix: SourceAppendix
@@ -133,7 +136,8 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
     )
 
 
-def compile_spec_to_report(spec: ReportSpec) -> Report:
+def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | None = None) -> Report:
+    visual_paths = visual_paths or {}
     sections: list[Section] = []
     for section in spec.sections:
         if section.section_id == "scope":
@@ -169,6 +173,7 @@ def compile_spec_to_report(spec: ReportSpec) -> Report:
             blocks=[
                 Figure(
                     title=visual.visual_id.replace("_", " ").title(),
+                    path=visual_paths[visual.visual_id].name if visual.visual_id in visual_paths else None,
                     caption=f"{visual.visual_type} routed to {visual.preferred_tool}; source-backed by {', '.join(visual.provenance_fact_ids)}.",
                     alt_text=visual.plain_text_payload,
                 )
@@ -189,12 +194,13 @@ def compile_spec_to_report(spec: ReportSpec) -> Report:
 def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None = None) -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     spec = compile_report_spec(pack)
-    report = compile_spec_to_report(spec)
+    artifact_stem = _stem(stem or pack.title)
+    visual_paths = _write_visual_artifacts(spec, out_dir, artifact_stem)
+    report = compile_spec_to_report(spec, visual_paths)
     qa = run_quality_gates(report)
     if not qa.ok:
         codes = ", ".join(check.code for check in qa.checks if check.severity == "error")
         raise ValueError(f"ReportSpec compiled invalid report: {codes}")
-    artifact_stem = _stem(stem or pack.title)
     spec_path = out_dir / f"{artifact_stem}.spec.json"
     ir_path = out_dir / f"{artifact_stem}.json"
     html_path = out_dir / f"{artifact_stem}.html"
@@ -202,8 +208,66 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
-    render_pdf(report, pdf_path)
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path}
+    render_html_pdf_with_chromium(html_path, pdf_path)
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, **visual_paths}
+
+
+def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:
+    paths: dict[str, Path] = {}
+    for visual in spec.visuals:
+        if visual.preferred_tool != "mermaid":
+            continue
+        source_path = out_dir / f"{artifact_stem}.{visual.visual_id}.mmd"
+        svg_path = out_dir / f"{artifact_stem}.{visual.visual_id}.svg"
+        source_path.write_text(_mermaid_payload(visual), encoding="utf-8")
+        _render_mermaid_svg(source_path, svg_path)
+        paths[visual.visual_id] = svg_path
+    return paths
+
+
+def _render_mermaid_svg(source_path: Path, output_path: Path) -> None:
+    npx = shutil.which("npx") or shutil.which("npx.cmd")
+    if not npx:
+        raise RuntimeError("Mermaid visual rendering requires npx on PATH")
+    result = subprocess.run(
+        [npx, "--yes", "@mermaid-js/mermaid-cli", "--quiet", "-i", str(source_path), "-o", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"Mermaid render failed for {source_path}: {result.stderr or result.stdout}")
+
+
+def _mermaid_payload(visual: SpecVisual) -> str:
+    lines = ["flowchart LR"]
+    for row in [line for line in visual.plain_text_payload.splitlines()[1:] if "->" in line]:
+        parts = [part.strip() for part in row.split("->")]
+        if len(parts) < 3:
+            continue
+        source, fact, claims = parts[0], parts[1], parts[2]
+        source_id = _node_id(source, "source")
+        fact_id = _node_id(fact, "fact")
+        lines.append(f'  {source_id}["{_escape_mermaid(source)}"] --> {fact_id}["{_escape_mermaid(fact)}"]')
+        for claim in [item.strip() for item in claims.split(",") if item.strip()]:
+            claim_id = _node_id(claim, "claim")
+            lines.append(f'  {fact_id} --> {claim_id}["{_escape_mermaid(claim)}"]')
+    lines.extend([
+        "  classDef source fill:#ecfeff,stroke:#0891b2,color:#164e63",
+        "  classDef fact fill:#f5f3ff,stroke:#7c3aed,color:#3b0764",
+        "  classDef claim fill:#f0fdf4,stroke:#16a34a,color:#14532d",
+        "  class source_0 source",
+    ])
+    return "\n".join(lines) + "\n"
+
+
+def _node_id(value: str, prefix: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_]", "_", value).strip("_") or prefix
+    return f"{prefix}_{cleaned[:48]}"
+
+
+def _escape_mermaid(value: str) -> str:
+    return value.replace('"', "'")[:80]
 
 
 def _ensure_valid_evidence(pack: EvidencePack) -> None:

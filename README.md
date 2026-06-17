@@ -22,7 +22,8 @@ The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LAT
 - Pydantic report IR: sections, text, claims, citations, figures, metric cards, tables.
 - Quality gates: unsupported claims, missing alt text warnings, ragged tables.
 - HTML renderer for preview/share.
-- Real PDF renderer via ReportLab.
+- Legacy PDF renderer via ReportLab for basic IR builds.
+- Software-backed PDF renderer via Playwright/Chromium for strict ReportSpec compilation.
 - CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and fixture adapter `reportfoundry research-run`.
 - Example report fixture.
 - Analyst-factory contracts: case rubric, source plan, visual plan, worker plan, gate routing.
@@ -127,9 +128,9 @@ Outputs:
 - `*.spec.json` — strict ReportSpec: sections, claim fact IDs, visual provenance, source appendix, and renderer/tool routes.
 - `*.json` — renderer-neutral Report IR compiled from the spec.
 - `*.html` — HTML/CSS preview artifact.
-- `*.pdf` — ReportLab PDF artifact.
+- `*.pdf` — Playwright/Chromium print-to-PDF artifact from the generated HTML/CSS package.
 
-This is the first practical version of the foundry toolkit model: LLM/research fills a strict plain-text+structured spec, the foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance.
+This is the first practical version of the foundry toolkit model: LLM/research fills a strict plain-text+structured spec, the foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance. The PDF route uses Chromium as the layout engine; the LLM does not hand-edit PDF geometry.
 
 ## Ollama Cloud newsletter path
 
@@ -162,11 +163,12 @@ The workflow fails closed when required source data is missing or a claim refere
 
 The PDF is not the source of truth. The canonical artifact is a semantic report IR with claim-level provenance. Renderers are adapters.
 
-Planned backends:
+Current and planned backends:
 
+- Playwright/Chromium for open-source browser layout and PDF export
 - WeasyPrint for open-source HTML/CSS paged media
 - PrinceXML for premium PDF/A and PDF/UA publishing
-- Playwright for web-dashboard reports and visual QA
+- Playwright screenshots for visual QA
 - Typst for deterministic technical reports
 - Plotly/Vega/Mermaid for chart and diagram assets
 

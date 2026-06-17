@@ -68,7 +68,7 @@ The eight principles are:
 - A claim is invalid unless every backing fact resolves to an observed source.
 - Extractors fail closed when expected facts cannot be found in the observed payload.
 - LLMs may propose scope, sources, code, visuals, and prose, but deterministic gates decide what is admissible and shippable.
-- Renderers are adapters: ReportLab now, WeasyPrint/PrinceXML/Typst/Playwright later.
+- Renderers are adapters: Playwright/Chromium is the strict ReportSpec PDF backend; ReportLab remains a legacy/basic renderer; WeasyPrint/PrinceXML/Typst are future adapters.
 - Charts and diagrams should be SVG/vector-first.
 - External assets require cached hashes, license metadata, alt text, and attribution.
 - Every report should ship with optional provenance JSON.
@@ -83,11 +83,12 @@ The same core should run as:
 
 External and internal information enter through connectors, but the connector does not bypass source law: every ingested item must become a source observation with ID, timestamp, hash/fingerprint, trust tier, and extraction provenance.
 
-## Planned adapters
+## Renderer and asset adapters
 
+- Playwright/Chromium: current strict ReportSpec HTML/CSS -> PDF backend.
 - WeasyPrint: open-source paged-media HTML/CSS backend.
 - PrinceXML: premium accessibility/archive publishing backend.
-- Playwright: web-dashboard and screenshot backend.
+- Playwright screenshots: web-dashboard and visual QA backend.
 - Typst: deterministic technical/whitepaper backend.
 - Vega/Plotly/Mermaid: chart and diagram asset builders.
 

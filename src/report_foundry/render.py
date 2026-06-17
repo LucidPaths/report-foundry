@@ -8,6 +8,7 @@ from __future__ import annotations
 from html import escape
 from pathlib import Path
 
+from playwright.sync_api import sync_playwright
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -21,7 +22,7 @@ def render_html(report: Report) -> str:
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         f"<title>{escape(report.title)}</title>",
-        "<style>body{font-family:Inter,system-ui,sans-serif;margin:48px;color:#101828;background:#f8fafc}"
+        "<style>@page{size:A4;margin:16mm}body{font-family:Inter,system-ui,sans-serif;margin:0;color:#101828;background:#f8fafc}"
         "main{max-width:900px;margin:auto;background:white;padding:48px;border-radius:24px;box-shadow:0 20px 60px #0001}"
         "h1{font-size:42px;margin-bottom:4px}.subtitle{color:#667085;font-size:18px}.section{page-break-before:always;margin-top:48px}"
         ".metric{display:inline-block;border:1px solid #d0d5dd;border-radius:16px;padding:16px 20px;margin:8px;background:#f9fafb}"
@@ -51,7 +52,8 @@ def render_html(report: Report) -> str:
                     parts.append(f"<div class='citation'><a href='{url}'>{label}</a> — {quote}</div>")
                 parts.append("</div>")
             elif isinstance(block, Figure):
-                parts.append(f"<figure class='figure'><strong>{escape(block.title)}</strong><figcaption>{escape(block.caption or block.alt_text or '')}</figcaption></figure>")
+                image = f"<img src='{escape(block.path)}' alt='{escape(block.alt_text or block.title)}' style='max-width:100%;border-radius:12px;border:1px solid #d0d5dd'>" if block.path else ""
+                parts.append(f"<figure class='figure'><strong>{escape(block.title)}</strong>{image}<figcaption>{escape(block.caption or block.alt_text or '')}</figcaption></figure>")
             elif isinstance(block, TableBlock):
                 parts.append("<table><thead><tr>" + "".join(f"<th>{escape(h)}</th>" for h in block.headers) + "</tr></thead><tbody>")
                 for row in block.rows:
@@ -60,6 +62,31 @@ def render_html(report: Report) -> str:
         parts.append("</section>")
     parts.append("</main></body></html>")
     return "".join(parts)
+
+
+def render_html_pdf_with_chromium(html_path: str | Path, output_path: str | Path) -> Path:
+    """Render an HTML/CSS report to PDF using Chromium's print engine.
+
+    This is the software-backed foundry path: the report/spec becomes HTML/CSS,
+    then a browser layout engine paginates and prints it. No LLM page drawing.
+    """
+
+    html_path = Path(html_path).resolve()
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1240, "height": 1754}, device_scale_factor=1)
+        page.goto(html_path.as_uri(), wait_until="networkidle")
+        page.pdf(
+            path=str(output_path),
+            format="A4",
+            print_background=True,
+            prefer_css_page_size=True,
+            margin={"top": "0", "right": "0", "bottom": "0", "left": "0"},
+        )
+        browser.close()
+    return output_path
 
 
 def render_pdf(report: Report, output_path: str | Path) -> Path:

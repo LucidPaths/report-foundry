@@ -13,7 +13,6 @@ from typer.testing import CliRunner
 from report_foundry.cli import app
 from report_foundry.evidence import EvidenceClaim, EvidenceFact, EvidencePack, SourceObservation
 from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts
-from report_foundry.render import render_pdf
 
 runner = CliRunner()
 
@@ -76,7 +75,7 @@ def test_compile_report_spec_is_strict_tool_feed() -> None:
 
     assert spec.title == "SpaceX IPO readiness brief"
     assert spec.render_targets == ["html", "pdf"]
-    assert spec.tool_routes["pdf"] == "reportlab"
+    assert spec.tool_routes["pdf"] == "playwright_chromium"
     assert spec.tool_routes["html"] == "html_css"
     assert len(spec.sections) >= 3
     assert all(section.blocks for section in spec.sections)
@@ -100,13 +99,17 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf"}
+    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map"}
     for path in paths.values():
         assert path.exists(), path
         assert path.stat().st_size > 0, path
+    assert paths["evidence_trace_map"].suffix == ".svg"
+    assert "<svg" in paths["evidence_trace_map"].read_text(encoding="utf-8")
     assert paths["pdf"].read_bytes().startswith(b"%PDF")
+    assert b"Chromium" in paths["pdf"].read_bytes()
+    assert b"Skia/PDF" in paths["pdf"].read_bytes()
     spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
-    assert spec["tool_routes"]["pdf"] == "reportlab"
+    assert spec["tool_routes"]["pdf"] == "playwright_chromium"
 
 
 def test_compile_spec_command_builds_pdf_from_evidence_pack(tmp_path: Path) -> None:

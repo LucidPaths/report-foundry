@@ -22,7 +22,8 @@ The foundry is the product. AI/search providers are replaceable input capabiliti
 - [x] Pydantic report IR
 - [x] Claim-level citations
 - [x] HTML renderer
-- [x] Real PDF renderer via ReportLab
+- [x] Legacy/basic PDF renderer via ReportLab
+- [x] strict ReportSpec PDF renderer via Playwright/Chromium software backend
 - [x] Quality gates
 - [x] CLI build/validate
 - [x] Example report
@@ -49,6 +50,7 @@ The foundry is the product. AI/search providers are replaceable input capabiliti
 
 ## v0.4 Serious PDF backends
 
+- [x] Playwright/Chromium HTML/CSS print-to-PDF adapter for strict ReportSpec artifacts
 - [ ] WeasyPrint adapter
 - [ ] PrinceXML adapter
 - [ ] Typst adapter
