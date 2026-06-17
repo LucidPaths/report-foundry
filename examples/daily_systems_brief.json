@@ -1,0 +1,26 @@
+{
+  "title": "Daily Systems Brief",
+  "subtitle": "AI-native report pipeline smoke test",
+  "author": "Report Foundry",
+  "sections": [
+    {
+      "title": "Model Signals",
+      "kicker": "Structured evidence becomes a designed PDF.",
+      "blocks": [
+        {"type": "text", "text": "Report Foundry compiles semantic report blocks into HTML and PDF artifacts."},
+        {"type": "metric", "label": "Evidence sources", "value": "3", "note": "claim-level citation slots"},
+        {
+          "type": "claim",
+          "text": "Claim-level citations are preserved through rendering.",
+          "confidence": "high",
+          "verification_status": "supported",
+          "citations": [
+            {"source_id": "src1", "url": "https://example.com/source", "title": "Example source", "quote": "citations are preserved"}
+          ]
+        },
+        {"type": "figure", "title": "Signal map", "caption": "Vector-first visual slot for future chart/diagram adapters.", "alt_text": "A placeholder signal map"},
+        {"type": "table", "caption": "Renderer matrix", "headers": ["Backend", "Use"], "rows": [["ReportLab", "MVP PDF export"], ["WeasyPrint", "future paged-media adapter"], ["PrinceXML", "future premium adapter"]]}
+      ]
+    }
+  ]
+}

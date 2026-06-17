@@ -1,0 +1,31 @@
+[project]
+name = "report-foundry"
+version = "0.1.0"
+description = "AI-native evidence-to-PDF report compiler with provenance, QA, and Discord-ready artifacts."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "LucidPaths"}]
+dependencies = [
+  "jinja2>=3.1",
+  "pydantic>=2.0",
+  "reportlab>=4.0",
+  "typer>=0.12",
+  "rich>=13.0"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+charts = ["plotly>=6.0", "kaleido>=1.0"]
+weasy = ["weasyprint>=65.0"]
+
+[project.scripts]
+reportfoundry = "report_foundry.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
