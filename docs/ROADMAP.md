@@ -11,6 +11,7 @@ The foundry is the product. AI/search providers are replaceable input capabiliti
 ## v0.0 Foundry intake
 
 - [x] Report Foundry principle lattice doctrine with enforced `Lattice:` file notation
+- [x] HiveMind-style `CLAUDE.md` operating layer with lattice summary, traps, and pre-commit checks
 - [x] explicit `FoundryRunRequest`: keyword/topic plus user-connected AI/search provider references
 - [x] raw API keys rejected from typed intake models; store references/handles only
 - [ ] connector interface that turns AI/search results into source observations
