@@ -113,6 +113,24 @@ Outputs:
 
 This mode is deterministic and local. It does not discover web sources or claim live facts by itself; it only normalizes marked source files into the evidence contract.
 
+## Strict ReportSpec compilation
+
+Compile an `evidence_pack.json` into the machine-checkable tool-feed layer and real artifacts:
+
+```bash
+uv run reportfoundry compile-spec .factory-run/spacex-ipo/evidence_pack.json \
+  --out-dir .output_spec/spacex-ipo
+```
+
+Outputs:
+
+- `*.spec.json` — strict ReportSpec: sections, claim fact IDs, visual provenance, source appendix, and renderer/tool routes.
+- `*.json` — renderer-neutral Report IR compiled from the spec.
+- `*.html` — HTML/CSS preview artifact.
+- `*.pdf` — ReportLab PDF artifact.
+
+This is the first practical version of the foundry toolkit model: LLM/research fills a strict plain-text+structured spec, the foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance.
+
 ## Ollama Cloud newsletter path
 
 Generate a live model brief from Ollama Cloud. The script now writes a mechanically sourced evidence pack, semantic IR, designed HTML preview, deterministic PDF, and Discord-ready attachment message:

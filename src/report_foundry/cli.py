@@ -13,9 +13,11 @@ from rich import print
 
 from .factory import write_run_package
 from .ir import Report
+from .evidence import EvidencePack
 from .qa import run_quality_gates
 from .research import write_research_artifacts
 from .render import render_html, render_pdf
+from .report_spec import write_spec_artifacts
 
 app = typer.Typer(help="AI-native evidence-to-PDF report compiler.")
 
@@ -51,6 +53,16 @@ def research_run(run_dir: Path, source_dir: Path = typer.Option(..., help="Direc
     print(f"route_back={result.gate_result.route_back_department or 'none'} score={result.gate_result.score}")
     if not result.gate_result.ok:
         raise typer.Exit(1)
+
+
+@app.command("compile-spec")
+def compile_spec(input: Path, out_dir: Path = Path(".output_spec")) -> None:
+    """Compile an EvidencePack into strict ReportSpec, IR, HTML, and PDF artifacts."""
+    pack = EvidencePack.model_validate_json(input.read_text(encoding="utf-8"))
+    paths = write_spec_artifacts(pack, out_dir, stem=input.stem)
+    print(f"[green]report spec[/green] {paths['spec']}")
+    print(f"[green]built[/green] {paths['html']}")
+    print(f"[green]built[/green] {paths['pdf']}")
 
 
 @app.command()
