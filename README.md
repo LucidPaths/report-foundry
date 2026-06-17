@@ -25,7 +25,7 @@ The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LAT
 - Real PDF renderer via ReportLab.
 - CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and fixture adapter `reportfoundry research-run`.
 - Example report fixture.
-- Analyst-factory contracts: case rubric, source plan, visual plan, gate routing.
+- Analyst-factory contracts: case rubric, source plan, visual plan, worker plan, gate routing.
 
 ## Quick start
 
@@ -85,6 +85,7 @@ Outputs:
 - `rubric.json` — case-specific report law created before research/rendering.
 - `source_plan.json` — required source coverage per inferred dimension.
 - `visual_plan.json` — provenance-required chart/map/matrix/timeline contracts.
+- `worker_plan.json` — HIVE-style executable topology: research workers per source dimension, synthesis worker, visual workers, final QA worker, shared scratchpad sections, dependency edges, completion signals, and health checks.
 - `initial_gate_result.json` — fail-closed route-back result. A new run with no observed evidence should route to Research.
 
 This is a planning package, not a completed deep-research report. Research/connectors must satisfy the source plan before synthesis/rendering can ship.

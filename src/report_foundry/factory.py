@@ -133,6 +133,26 @@ class VisualPlan(BaseModel):
     items: list[VisualPlanItem]
 
 
+class WorkerTask(BaseModel):
+    worker_id: str
+    department: Department
+    task: str
+    inputs: list[str] = Field(default_factory=list)
+    outputs: list[str] = Field(default_factory=list)
+    scratchpad_section: str
+    depends_on: list[str] = Field(default_factory=list)
+    completion_signal: str = "append scratchpad section and emit worker_complete notification"
+    health_checks: list[str] = Field(default_factory=lambda: ["token_delta_or_file_output", "bounded_runtime"])
+
+
+class AutonomyPlan(BaseModel):
+    topic: str
+    scratchpad_id: str
+    workspace_policy: Literal["isolated_run_directory"] = "isolated_run_directory"
+    notification_policy: str = "worker completion emits compact status plus scratchpad section pointer"
+    tasks: list[WorkerTask]
+
+
 class PageMetrics(BaseModel):
     page_number: int
     fill_ratio: float
@@ -160,6 +180,7 @@ class RunPackage(BaseModel):
     manifest: ReportRunManifest
     source_plan: SourcePlan
     visual_plan: VisualPlan
+    worker_plan: AutonomyPlan
     initial_gate_result: FactoryGateResult
 
 
@@ -276,6 +297,62 @@ def build_visual_plan(rubric: ReportRubric) -> VisualPlan:
     )
 
 
+def build_autonomy_plan(*, topic: str, source_plan: SourcePlan, visual_plan: VisualPlan) -> AutonomyPlan:
+    research_tasks = [
+        WorkerTask(
+            worker_id=f"research-{_slug(item.dimension)}",
+            department=Department.RESEARCH,
+            task=(
+                f"Acquire and observe sources for {item.dimension}; extract source-bound facts only when "
+                f"they satisfy the acceptance rule: {item.acceptance_rule}"
+            ),
+            inputs=["manifest.json", "source_plan.json", f"dimension:{item.dimension}", *item.source_hints],
+            outputs=["source observations", "dimension facts", f"scratchpad:research/{item.dimension}"],
+            scratchpad_section=f"research/{item.dimension}",
+        )
+        for item in source_plan.items
+    ]
+    research_ids = [task.worker_id for task in research_tasks]
+    synthesis_task = WorkerTask(
+        worker_id="synthesis-claims",
+        department=Department.SYNTHESIS,
+        task="Synthesize hard-hitting claims only from scratchpad facts; preserve fact IDs and uncertainty.",
+        inputs=["manifest.json", "source_plan.json", "scratchpad:research/*"],
+        outputs=["evidence claims", "evidence_pack.json"],
+        scratchpad_section="synthesis/claims",
+        depends_on=research_ids,
+    )
+    visual_tasks = [
+        WorkerTask(
+            worker_id=f"visuals-{_slug(item.visual_id)}",
+            department=Department.VISUALS,
+            task=(
+                f"Design {item.visual_type} '{item.visual_id}' for this purpose: {item.purpose} "
+                f"Acceptance rule: {item.acceptance_rule}"
+            ),
+            inputs=["visual_plan.json", "evidence_pack.json", "scratchpad:synthesis/claims"],
+            outputs=["visual specification", f"scratchpad:visuals/{item.visual_id}"],
+            scratchpad_section=f"visuals/{item.visual_id}",
+            depends_on=["synthesis-claims"],
+        )
+        for item in visual_plan.items
+    ]
+    qa_task = WorkerTask(
+        worker_id="qa-final-gates",
+        department=Department.QA,
+        task="Run evidence, synthesis, visual provenance, and layout gates; route failures to the earliest responsible department.",
+        inputs=["manifest.json", "evidence_pack.json", "visual_plan.json", "scratchpad:visuals/*"],
+        outputs=["research_gate_result.json", "final_gate_result.json"],
+        scratchpad_section="qa/final-gates",
+        depends_on=[task.worker_id for task in visual_tasks] or ["synthesis-claims"],
+    )
+    return AutonomyPlan(
+        topic=topic,
+        scratchpad_id=f"report-foundry-{_slug(topic)}",
+        tasks=[*research_tasks, synthesis_task, *visual_tasks, qa_task],
+    )
+
+
 def write_run_package(
     *,
     topic: str,
@@ -293,6 +370,7 @@ def write_run_package(
     )
     source_plan = build_source_plan(rubric)
     visual_plan = build_visual_plan(rubric)
+    worker_plan = build_autonomy_plan(topic=topic, source_plan=source_plan, visual_plan=visual_plan)
     empty_evidence = EvidencePack(title=topic, scope={"status": "planning_only_no_sources_observed_yet"})
     initial_gate_result = evaluate_factory_gates(
         manifest,
@@ -305,8 +383,9 @@ def write_run_package(
     _write_json(out_dir / "rubric.json", rubric)
     _write_json(out_dir / "source_plan.json", source_plan)
     _write_json(out_dir / "visual_plan.json", visual_plan)
+    _write_json(out_dir / "worker_plan.json", worker_plan)
     _write_json(out_dir / "initial_gate_result.json", initial_gate_result)
-    return RunPackage(run_dir=out_dir, manifest=manifest, source_plan=source_plan, visual_plan=visual_plan, initial_gate_result=initial_gate_result)
+    return RunPackage(run_dir=out_dir, manifest=manifest, source_plan=source_plan, visual_plan=visual_plan, worker_plan=worker_plan, initial_gate_result=initial_gate_result)
 
 
 def evaluate_factory_gates(manifest: ReportRunManifest, evidence: EvidencePack, *, pages: list[PageMetrics]) -> FactoryGateResult:
@@ -436,6 +515,10 @@ def _visual_purpose(visual_id: str) -> str:
 
 def _write_json(path: Path, model: BaseModel) -> None:
     path.write_text(model.model_dump_json(indent=2), encoding="utf-8")
+
+
+def _slug(value: str) -> str:
+    return "-".join(part for part in value.lower().replace("_", "-").split() if part).replace("--", "-")
 
 
 def _first_error_department(checks: list[FactoryGateCheck]) -> Department | None:
