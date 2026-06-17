@@ -11,7 +11,16 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from report_foundry.cli import app
-from report_foundry.evidence import EvidenceClaim, EvidenceFact, EvidencePack, ReportNarrativeSection, SourceObservation
+from report_foundry.evidence import (
+    EvidenceClaim,
+    EvidenceFact,
+    EvidencePack,
+    ProfessionalKeyTakeaway,
+    ProfessionalReportContent,
+    ProfessionalReportSection,
+    ReportNarrativeSection,
+    SourceObservation,
+)
 from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts
 
 runner = CliRunner()
@@ -80,6 +89,78 @@ def make_evidence_pack() -> EvidencePack:
         ],
         tags=["spec-fixture"],
     )
+
+
+def make_professional_evidence_pack() -> EvidencePack:
+    pack = make_evidence_pack()
+    pack.professional_report = ProfessionalReportContent(
+        one_sentence_thesis="SpaceX IPO readiness should be evaluated as separate execution, recurring-revenue, and disclosure gates rather than a single hype narrative.",
+        executive_summary=[
+            "Professional reports lead with the answer, then show the evidence path. This brief therefore starts with a thesis, key takeaways, and decision relevance before showing claims or appendices.",
+            "The available evidence supports an IPO-readiness map, not an IPO-ready verdict, because source-observed financial and control evidence is missing from the pack.",
+        ],
+        key_takeaways=[
+            ProfessionalKeyTakeaway(
+                takeaway="Starlink economics is the commercial hinge of the IPO story.",
+                fact_ids=["fact_starlink"],
+                implication="Recurring broadband revenue is the difference between launch-company and infrastructure-platform framing.",
+            ),
+            ProfessionalKeyTakeaway(
+                takeaway="Launch cadence is execution evidence, not financial-readiness evidence.",
+                fact_ids=["fact_launch"],
+                implication="Operations can be strong while valuation evidence remains incomplete.",
+            ),
+        ],
+        sections=[
+            ProfessionalReportSection(
+                section_id="starlink_hinge",
+                role="financial_analysis",
+                headline="Starlink economics is the hinge, but the financial proof is still absent",
+                lede="Investor-style reports separate the commercial engine from the operating narrative. For SpaceX, that means Starlink cannot be treated as a footnote.",
+                paragraphs=[
+                    "If Starlink demonstrates durable subscriber economics, SpaceX can be framed partly as a recurring infrastructure platform. If those economics are weak or unobserved, the public-market story falls back toward launch cadence and project revenue.",
+                ],
+                fact_ids=["fact_starlink"],
+                so_what="The next research cycle must prioritize Starlink ARPU, churn, margin, capex, and subscriber trend evidence before any valuation section is credible.",
+                limitations=["The fixture does not include audited Starlink financials or unit economics."],
+            ),
+            ProfessionalReportSection(
+                section_id="launch_repeatability",
+                role="operating_analysis",
+                headline="Launch cadence supports execution credibility but cannot carry the IPO thesis alone",
+                lede="Consulting-style reports turn operational facts into decision implications instead of treating them as trivia.",
+                paragraphs=[
+                    "Repeated payload delivery and launch cadence matter because public investors price repeatability. The same evidence does not prove margins, backlog quality, customer concentration, or reporting readiness.",
+                ],
+                fact_ids=["fact_launch"],
+                so_what="A professional report should make launch cadence one readiness gate, not the whole conclusion.",
+                limitations=["The fixture does not include year-by-year launch cadence, payload mix, or reliability data."],
+            ),
+        ],
+        what_to_watch=[
+            "Starlink subscriber economics and capex intensity",
+            "Launch cadence by customer and payload class",
+            "Public-company controls, ownership, and disclosure readiness",
+        ],
+        methodology="Schema derived from observed public consulting, venture, market-intelligence, and investor report structures: answer first, conclusion-led sections, exhibits near evidence, explicit limitations, and source appendix.",
+    )
+    return pack
+
+
+def test_professional_report_schema_renders_answer_first_sections() -> None:
+    spec = compile_report_spec(make_professional_evidence_pack())
+
+    assert spec.sections[0].section_id == "executive_brief"
+    assert "one single hype narrative" not in spec.sections[0].blocks[0].content
+    assert "single hype narrative" in spec.sections[0].blocks[0].content
+    assert any(section.title.startswith("Starlink economics is the hinge") for section in spec.sections)
+    report = compile_spec_to_report(spec)
+    assert report.sections[0].title == "Executive brief"
+    first_page_text = "\n".join(block.text for block in report.sections[0].blocks if block.type == "text")
+    assert "Key takeaways:" in first_page_text
+    html = __import__("report_foundry.render", fromlist=["render_html"]).render_html(report)
+    assert "<ul>" in html and "<li>Starlink economics is the commercial hinge" in html
+    assert "So what:" in "\n".join(block.text for section in report.sections for block in section.blocks if block.type == "text")
 
 
 def test_compile_report_spec_is_strict_tool_feed() -> None:

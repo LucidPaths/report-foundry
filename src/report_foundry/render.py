@@ -18,6 +18,16 @@ from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, 
 from .ir import Claim, Figure, MetricCard, Report, TableBlock, TextBlock
 
 
+def _render_text_block(text: str) -> str:
+    escaped = escape(text)
+    lines = [line.strip() for line in escaped.splitlines() if line.strip()]
+    if len(lines) > 1 and lines[0].endswith(":") and all(line.startswith("• ") for line in lines[1:]):
+        items = "".join(f"<li>{line[2:]}</li>" for line in lines[1:])
+        return f"<p><strong>{lines[0]}</strong></p><ul>{items}</ul>"
+    if lines and all(line.startswith("• ") for line in lines):
+        return "<ul>" + "".join(f"<li>{line[2:]}</li>" for line in lines) + "</ul>"
+    return f"<p>{escaped}</p>"
+
 def render_html(report: Report) -> str:
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
@@ -40,7 +50,7 @@ def render_html(report: Report) -> str:
             parts.append(f"<p class='subtitle'>{escape(section.kicker)}</p>")
         for block in section.blocks:
             if isinstance(block, TextBlock):
-                parts.append(f"<p>{escape(block.text)}</p>")
+                parts.append(_render_text_block(block.text))
             elif isinstance(block, MetricCard):
                 parts.append(f"<div class='metric'><span>{escape(block.label)}</span><strong>{escape(block.value)}</strong><small>{escape(block.note or '')}</small></div>")
             elif isinstance(block, Claim):

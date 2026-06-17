@@ -94,6 +94,67 @@ class ReportSpec(BaseModel):
     fact_details: dict[str, SpecFact]
 
 
+def _professional_report_sections(pack: EvidencePack) -> list[SpecSection]:
+    professional = pack.professional_report
+    if professional is None:
+        return []
+
+    sections = [
+        SpecSection(
+            section_id="executive_brief",
+            title="Executive brief",
+            role="report",
+            blocks=[
+                SpecBlock(role="paragraph", content=professional.one_sentence_thesis),
+                *[SpecBlock(role="paragraph", content=paragraph) for paragraph in professional.executive_summary],
+                SpecBlock(
+                    role="paragraph",
+                    content="Key takeaways:\n" + "\n".join(
+                        f"• {takeaway.takeaway}" + (f" — {takeaway.implication}" if takeaway.implication else "")
+                        for takeaway in professional.key_takeaways
+                    ),
+                    fact_ids=sorted({fact_id for takeaway in professional.key_takeaways for fact_id in takeaway.fact_ids}),
+                ),
+            ],
+        )
+    ]
+    for section in professional.sections:
+        blocks = [
+            SpecBlock(role="paragraph", content=section.lede, fact_ids=section.fact_ids),
+            *[SpecBlock(role="paragraph", content=paragraph, fact_ids=section.fact_ids) for paragraph in section.paragraphs],
+            SpecBlock(role="paragraph", content=f"So what: {section.so_what}", fact_ids=section.fact_ids),
+        ]
+        if section.limitations:
+            blocks.append(SpecBlock(role="paragraph", content="Limits: " + " ".join(section.limitations), fact_ids=section.fact_ids))
+        sections.append(
+            SpecSection(
+                section_id=section.section_id,
+                title=section.headline,
+                role="report",
+                blocks=blocks,
+            )
+        )
+    if professional.what_to_watch:
+        sections.append(
+            SpecSection(
+                section_id="what_to_watch",
+                title="What to watch",
+                role="report",
+                blocks=[SpecBlock(role="paragraph", content="\n".join(f"• {item}" for item in professional.what_to_watch))],
+            )
+        )
+    if professional.methodology:
+        sections.append(
+            SpecSection(
+                section_id="methodology",
+                title="Methodology",
+                role="report",
+                blocks=[SpecBlock(role="paragraph", content=professional.methodology)],
+            )
+        )
+    return sections
+
+
 def compile_report_spec(pack: EvidencePack) -> ReportSpec:
     _ensure_valid_evidence(pack)
     facts_by_id = {fact.fact_id: fact for fact in pack.facts}
@@ -106,15 +167,17 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
         [source.source_id, source.title, source.url or "", source.observed_at, source.content_sha256[:16] + "…", source.extractor]
         for source in pack.sources
     ]
-    report_sections = [
-        SpecSection(
-            section_id=section.section_id,
-            title=section.title,
-            role="report",
-            blocks=[SpecBlock(role="paragraph", content=paragraph, fact_ids=section.fact_ids) for paragraph in section.paragraphs],
-        )
-        for section in pack.report_sections
-    ]
+    report_sections = _professional_report_sections(pack)
+    if not report_sections:
+        report_sections = [
+            SpecSection(
+                section_id=section.section_id,
+                title=section.title,
+                role="report",
+                blocks=[SpecBlock(role="paragraph", content=paragraph, fact_ids=section.fact_ids) for paragraph in section.paragraphs],
+            )
+            for section in pack.report_sections
+        ]
     if not report_sections:
         report_sections = [
             SpecSection(

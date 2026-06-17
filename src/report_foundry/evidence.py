@@ -14,6 +14,18 @@ from .ir import Citation, Report
 from .qa import QualityCheck, QualityResult
 
 Confidence = Literal["high", "medium", "low", "unknown"]
+ProfessionalSectionRole = Literal[
+    "market_context",
+    "thesis",
+    "trend_analysis",
+    "operating_analysis",
+    "financial_analysis",
+    "scenario_analysis",
+    "risk_analysis",
+    "implications",
+    "recommendations",
+    "methodology",
+]
 
 
 class SourceObservation(BaseModel):
@@ -79,6 +91,57 @@ class ReportNarrativeSection(BaseModel):
         return value
 
 
+class ProfessionalKeyTakeaway(BaseModel):
+    """Executive takeaway: conclusion first, with explicit evidence support."""
+
+    takeaway: str
+    fact_ids: list[str]
+    implication: str | None = None
+
+
+class ProfessionalReportSection(BaseModel):
+    """Professional report section contract observed in consulting/investor reports.
+
+    Headline is a conclusion, lede orients the reader, evidence supports the
+    argument, so_what explains decision relevance, limitations bound certainty.
+    """
+
+    section_id: str
+    role: ProfessionalSectionRole
+    headline: str
+    lede: str
+    paragraphs: list[str]
+    fact_ids: list[str]
+    so_what: str
+    limitations: list[str] = Field(default_factory=list)
+    exhibit_refs: list[str] = Field(default_factory=list)
+
+    @field_validator("paragraphs")
+    @classmethod
+    def paragraphs_required(cls, value: list[str]) -> list[str]:
+        if not value or not any(item.strip() for item in value):
+            raise ValueError("professional sections must contain report prose")
+        return value
+
+
+class ProfessionalReportContent(BaseModel):
+    """Reader-facing report schema derived from public professional reports."""
+
+    one_sentence_thesis: str
+    executive_summary: list[str]
+    key_takeaways: list[ProfessionalKeyTakeaway]
+    sections: list[ProfessionalReportSection]
+    what_to_watch: list[str] = Field(default_factory=list)
+    methodology: str | None = None
+
+    @field_validator("executive_summary", "key_takeaways", "sections")
+    @classmethod
+    def required_lists(cls, value: list[object]) -> list[object]:
+        if not value:
+            raise ValueError("professional report content requires summary, takeaways, and sections")
+        return value
+
+
 class EvidencePack(BaseModel):
     title: str
     subtitle: str | None = None
@@ -89,6 +152,7 @@ class EvidencePack(BaseModel):
     facts: list[EvidenceFact] = Field(default_factory=list)
     claims: list[EvidenceClaim] = Field(default_factory=list)
     report_sections: list[ReportNarrativeSection] = Field(default_factory=list)
+    professional_report: ProfessionalReportContent | None = None
     tags: list[str] = Field(default_factory=list)
 
 
@@ -144,6 +208,28 @@ def validate_evidence_pack(pack: EvidencePack) -> QualityResult:
                         location=f"report_sections[{section_index}].fact_ids",
                     )
                 )
+
+    if pack.professional_report:
+        for takeaway_index, takeaway in enumerate(pack.professional_report.key_takeaways):
+            for fact_id in takeaway.fact_ids:
+                if fact_id not in fact_ids:
+                    checks.append(
+                        QualityCheck(
+                            code="missing_fact",
+                            message=f"Professional takeaway references unknown fact {fact_id}.",
+                            location=f"professional_report.key_takeaways[{takeaway_index}].fact_ids",
+                        )
+                    )
+        for section_index, section in enumerate(pack.professional_report.sections):
+            for fact_id in section.fact_ids:
+                if fact_id not in fact_ids:
+                    checks.append(
+                        QualityCheck(
+                            code="missing_fact",
+                            message=f"Professional section references unknown fact {fact_id}.",
+                            location=f"professional_report.sections[{section_index}].fact_ids",
+                        )
+                    )
 
     return QualityResult(ok=not any(check.severity == "error" for check in checks), checks=checks)
 
