@@ -6,11 +6,35 @@ from pathlib import Path
 import typer
 from rich import print
 
+from .factory import write_run_package
 from .ir import Report
 from .qa import run_quality_gates
 from .render import render_html, render_pdf
 
 app = typer.Typer(help="AI-native evidence-to-PDF report compiler.")
+
+
+@app.command("plan-run")
+def plan_run(
+    topic: str,
+    audience: str = "executive readers",
+    out_dir: Path = Path(".factory-run"),
+    integration_mode: str = "cli",
+    source: list[str] = typer.Option(default_factory=list, help="Connected source namespace, MCP tool, database, or web connector."),
+) -> None:
+    """Create a factory run package from a topic before research starts."""
+    if integration_mode not in {"cli", "mcp", "server", "library"}:
+        print(f"[red]invalid integration mode[/red]: {integration_mode}")
+        raise typer.Exit(1)
+    package = write_run_package(
+        topic=topic,
+        audience=audience,
+        out_dir=out_dir,
+        integration_mode=integration_mode,  # type: ignore[arg-type]
+        connected_sources=source,
+    )
+    print(f"[green]factory run package[/green] {package.run_dir}")
+    print(f"route_back={package.initial_gate_result.route_back_department or 'none'} score={package.initial_gate_result.score}")
 
 
 @app.command()

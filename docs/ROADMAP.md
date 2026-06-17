@@ -50,8 +50,9 @@
 - [x] first `factory` schema for departments, run manifest, case rubric, page metrics, and gate results
 - [x] deterministic seed rubrics for SpaceX IPO and European banking examples
 - [x] route-back gates for missing research dimensions, vague claims, underfilled pages, and missing source appendix
-- [ ] source-plan artifact with primary/trusted source quotas per required dimension
-- [ ] visual-plan artifact with chart/map/diagram/image provenance requirements
+- [x] source-plan artifact with primary/trusted source quotas per required dimension
+- [x] visual-plan artifact with chart/map/diagram/image provenance requirements
+- [x] `reportfoundry plan-run` CLI that persists manifest, rubric, source plan, visual plan, and initial gate result
 - [ ] final AI reviewer rubric that reads/looks at generated PDF screenshots and scores against the initial case rubric
 - [ ] iterative department retry loop: failed gate returns the artifact to the responsible department with repair instructions
 

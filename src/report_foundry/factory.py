@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -49,6 +50,32 @@ class ReportRunManifest(BaseModel):
     connected_sources: list[str] = Field(default_factory=list)
 
 
+class SourcePlanItem(BaseModel):
+    dimension: str
+    purpose: str
+    required_source_tiers: dict[str, int] = Field(default_factory=dict)
+    source_hints: list[str] = Field(default_factory=list)
+    acceptance_rule: str
+
+
+class SourcePlan(BaseModel):
+    topic: str
+    items: list[SourcePlanItem]
+
+
+class VisualPlanItem(BaseModel):
+    visual_id: str
+    purpose: str
+    visual_type: Literal["chart", "map", "matrix", "timeline", "diagram"]
+    provenance_required: bool = True
+    acceptance_rule: str
+
+
+class VisualPlan(BaseModel):
+    topic: str
+    items: list[VisualPlanItem]
+
+
 class PageMetrics(BaseModel):
     page_number: int
     fill_ratio: float
@@ -69,6 +96,14 @@ class FactoryGateResult(BaseModel):
     score: int
     checks: list[FactoryGateCheck] = Field(default_factory=list)
     route_back_department: Department | None = None
+
+
+class RunPackage(BaseModel):
+    run_dir: Path
+    manifest: ReportRunManifest
+    source_plan: SourcePlan
+    visual_plan: VisualPlan
+    initial_gate_result: FactoryGateResult
 
 
 SPACE_X_DIMENSIONS = [
@@ -130,6 +165,71 @@ def build_case_rubric(topic: str, *, audience: str) -> ReportRubric:
         required_source_tiers={"primary": 3, "trusted_secondary": 2},
         required_visuals={"numbers_chart", "relationship_map", "bull_bear_matrix"},
     )
+
+
+def build_source_plan(rubric: ReportRubric) -> SourcePlan:
+    return SourcePlan(
+        topic=rubric.topic,
+        items=[
+            SourcePlanItem(
+                dimension=dimension.name,
+                purpose=dimension.description,
+                required_source_tiers=_source_tier_quota(rubric),
+                source_hints=_source_hints_for_dimension(dimension.name),
+                acceptance_rule="At least one primary or trusted source observation must produce facts for this dimension.",
+            )
+            for dimension in rubric.required_dimensions
+            if dimension.required
+        ],
+    )
+
+
+def build_visual_plan(rubric: ReportRubric) -> VisualPlan:
+    return VisualPlan(
+        topic=rubric.topic,
+        items=[
+            VisualPlanItem(
+                visual_id=visual_id,
+                purpose=_visual_purpose(visual_id),
+                visual_type=_visual_type(visual_id),
+                acceptance_rule="Visual must cite source-backed data or source-backed relationship claims; decorative visuals fail QA.",
+            )
+            for visual_id in sorted(rubric.required_visuals)
+        ],
+    )
+
+
+def write_run_package(
+    *,
+    topic: str,
+    audience: str,
+    out_dir: Path,
+    integration_mode: Literal["cli", "mcp", "server", "library"] = "cli",
+    connected_sources: list[str] | None = None,
+) -> RunPackage:
+    rubric = build_case_rubric(topic, audience=audience)
+    manifest = ReportRunManifest(
+        topic=topic,
+        rubric=rubric,
+        integration_mode=integration_mode,
+        connected_sources=connected_sources or [],
+    )
+    source_plan = build_source_plan(rubric)
+    visual_plan = build_visual_plan(rubric)
+    empty_evidence = EvidencePack(title=topic, scope={"status": "planning_only_no_sources_observed_yet"})
+    initial_gate_result = evaluate_factory_gates(
+        manifest,
+        empty_evidence,
+        pages=[PageMetrics(page_number=1, fill_ratio=0.0, has_source_appendix=False)],
+    )
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(out_dir / "manifest.json", manifest)
+    _write_json(out_dir / "rubric.json", rubric)
+    _write_json(out_dir / "source_plan.json", source_plan)
+    _write_json(out_dir / "visual_plan.json", visual_plan)
+    _write_json(out_dir / "initial_gate_result.json", initial_gate_result)
+    return RunPackage(run_dir=out_dir, manifest=manifest, source_plan=source_plan, visual_plan=visual_plan, initial_gate_result=initial_gate_result)
 
 
 def evaluate_factory_gates(manifest: ReportRunManifest, evidence: EvidencePack, *, pages: list[PageMetrics]) -> FactoryGateResult:
@@ -202,6 +302,63 @@ def _is_hard_hitting_claim(text: str) -> bool:
     has_mechanism = any(marker in text.lower() for marker in ["because", "depends on", "drives", "through", "forces", "creates", "reduces", "raises"])
     has_specificity = any(char.isdigit() for char in text) or ";" in text or "," in text
     return has_mechanism and has_specificity
+
+
+def _source_tier_quota(rubric: ReportRubric) -> dict[str, int]:
+    primary = 1 if rubric.required_source_tiers.get("primary", 0) else 0
+    trusted = 1 if rubric.required_source_tiers.get("trusted_secondary", 0) else 0
+    return {"primary": primary, "trusted_secondary": trusted}
+
+
+def _source_hints_for_dimension(dimension: str) -> list[str]:
+    hints_by_keyword = {
+        "starlink": ["company metrics or filings", "subscriber/revenue disclosures", "trusted telecom market data"],
+        "government": ["government contract database", "NASA or defense procurement source", "company disclosures"],
+        "launch": ["launch manifest", "payload registry", "regulator or operator records"],
+        "listing": ["exchange rule filing", "securities regulator source", "issuer/listing documentation"],
+        "valuation": ["private market transaction data", "comparable public-company filings", "trusted market data provider"],
+        "covid": ["central bank balance-sheet data", "fiscal authority data", "statistical agency source"],
+        "sovereign": ["treasury/debt office data", "central bank data", "government budget documents"],
+        "gold": ["central bank reserve data", "IMF reserve statistics", "official FX reserve reports"],
+        "regulatory": ["law text", "regulator guidance", "official consultation paper"],
+        "credit": ["bank filings", "supervisory data", "real-estate credit statistics"],
+        "ecb": ["ECB data", "national central bank data", "sovereign spread data"],
+    }
+    normalized = dimension.lower()
+    for keyword, hints in hints_by_keyword.items():
+        if keyword in normalized:
+            return hints
+    return ["primary source", "trusted secondary source", "dataset or official documentation"]
+
+
+def _visual_type(visual_id: str) -> Literal["chart", "map", "matrix", "timeline", "diagram"]:
+    if "chart" in visual_id:
+        return "chart"
+    if "map" in visual_id:
+        return "map"
+    if "matrix" in visual_id:
+        return "matrix"
+    if "timeline" in visual_id or "listing_path" in visual_id:
+        return "timeline"
+    return "diagram"
+
+
+def _visual_purpose(visual_id: str) -> str:
+    purposes = {
+        "business_segment_map": "Show how business segments, funding channels, and risk drivers relate.",
+        "numbers_chart": "Compress the report's core numeric evidence into one readable chart.",
+        "bull_bear_matrix": "Make the strongest hype case and skeptic case comparable on one page.",
+        "timeline_or_listing_path": "Show sequencing, regulatory path, and key timing dependencies.",
+        "causal_map": "Show cause-and-effect relationships across policy, markets, and balance sheets.",
+        "risk_matrix": "Compare likelihood and impact of major risks without dense prose.",
+        "timeline": "Show the order of policy, market, and legal changes.",
+        "relationship_map": "Show actors, incentives, dependencies, and bottlenecks.",
+    }
+    return purposes.get(visual_id, f"Explain {visual_id.replace('_', ' ')} visually with sourced evidence.")
+
+
+def _write_json(path: Path, model: BaseModel) -> None:
+    path.write_text(model.model_dump_json(indent=2), encoding="utf-8")
 
 
 def _first_error_department(checks: list[FactoryGateCheck]) -> Department | None:

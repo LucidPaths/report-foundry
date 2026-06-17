@@ -10,8 +10,9 @@ Report Foundry turns structured evidence packs into beautiful, grounded reports 
 - Quality gates: unsupported claims, missing alt text warnings, ragged tables
 - HTML renderer for preview/share
 - Real PDF renderer via ReportLab
-- CLI: `reportfoundry validate` and `reportfoundry build`
+- CLI: `reportfoundry validate`, `reportfoundry build`, and `reportfoundry plan-run`
 - Example report fixture
+- Analyst-factory planning contracts: case rubric, source plan, visual plan, initial gate routing
 
 ## Quick start
 
@@ -27,6 +28,29 @@ Outputs:
 .output/daily_systems_brief.html
 .output/daily_systems_brief.pdf
 ```
+
+## Factory run planning
+
+Create the first executable factory package from keywords/topic before research starts:
+
+```bash
+uv run reportfoundry plan-run "current SpaceX IPO launch newsletter" \
+  --audience "executive readers" \
+  --integration-mode mcp \
+  --source company-db \
+  --source web \
+  --out-dir .factory-run/spacex-ipo
+```
+
+Outputs:
+
+- `manifest.json` — topic, audience, integration mode, connected source namespaces, and rubric.
+- `rubric.json` — case-specific report law created before research/rendering.
+- `source_plan.json` — required source coverage per inferred dimension.
+- `visual_plan.json` — provenance-required chart/map/matrix/timeline contracts.
+- `initial_gate_result.json` — fail-closed route-back result. A new run with no observed evidence should route to Research.
+
+This is a planning package, not a completed deep-research report. Research/connectors must satisfy the source plan before synthesis/rendering can ship.
 
 ## Ollama Cloud newsletter path
 

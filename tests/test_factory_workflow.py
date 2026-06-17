@@ -6,7 +6,10 @@ from report_foundry.factory import (
     PageMetrics,
     ReportRunManifest,
     build_case_rubric,
+    build_source_plan,
+    build_visual_plan,
     evaluate_factory_gates,
+    write_run_package,
 )
 
 
@@ -135,3 +138,47 @@ def test_layout_gate_requires_source_appendix_and_useful_page_fill_without_dense
     assert any("source appendix" in check.message for check in layout_failures)
     assert any("underfilled" in check.message for check in layout_failures)
     assert result.route_back_department == Department.LAYOUT
+
+
+def test_source_and_visual_plans_are_derived_from_case_rubric() -> None:
+    rubric = build_case_rubric("current SpaceX IPO launch newsletter", audience="executive readers")
+
+    source_plan = build_source_plan(rubric)
+    visual_plan = build_visual_plan(rubric)
+
+    assert {item.dimension for item in source_plan.items} >= {"starlink_economics", "listing_and_regulatory_mechanics"}
+    starlink_item = next(item for item in source_plan.items if item.dimension == "starlink_economics")
+    assert starlink_item.required_source_tiers["primary"] >= 1
+    assert any("company" in hint.lower() or "regulator" in hint.lower() for hint in starlink_item.source_hints)
+
+    assert {item.visual_id for item in visual_plan.items} >= {"business_segment_map", "numbers_chart", "bull_bear_matrix"}
+    assert all(item.provenance_required for item in visual_plan.items)
+    assert any("source" in item.acceptance_rule.lower() for item in visual_plan.items)
+
+
+def test_write_run_package_persists_manifest_plans_and_initial_gate_result(tmp_path) -> None:
+    out_dir = tmp_path / "factory-run"
+
+    package = write_run_package(
+        topic="current SpaceX IPO launch newsletter",
+        audience="executive readers",
+        out_dir=out_dir,
+        integration_mode="mcp",
+        connected_sources=["company-db", "web"],
+    )
+
+    assert package.run_dir == out_dir
+    assert (out_dir / "manifest.json").exists()
+    assert (out_dir / "rubric.json").exists()
+    assert (out_dir / "source_plan.json").exists()
+    assert (out_dir / "visual_plan.json").exists()
+    assert (out_dir / "initial_gate_result.json").exists()
+
+    manifest_text = (out_dir / "manifest.json").read_text(encoding="utf-8")
+    source_plan_text = (out_dir / "source_plan.json").read_text(encoding="utf-8")
+    gate_text = (out_dir / "initial_gate_result.json").read_text(encoding="utf-8")
+
+    assert "company-db" in manifest_text
+    assert "starlink_economics" in source_plan_text
+    assert "missing_required_dimension" in gate_text
+    assert package.initial_gate_result.route_back_department == Department.RESEARCH
