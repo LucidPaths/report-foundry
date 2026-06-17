@@ -21,7 +21,7 @@ from report_foundry.evidence import (
     ReportNarrativeSection,
     SourceObservation,
 )
-from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts
+from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts, _assert_pdf_layout_quality
 
 runner = CliRunner()
 
@@ -198,7 +198,7 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map"}
+    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics"}
     for path in paths.values():
         assert path.exists(), path
         assert path.stat().st_size > 0, path
@@ -207,10 +207,24 @@ def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path
     assert paths["pdf"].read_bytes().startswith(b"%PDF")
     assert b"Chromium" in paths["pdf"].read_bytes()
     assert b"Skia/PDF" in paths["pdf"].read_bytes()
+    layout = json.loads(paths["layout_metrics"].read_text(encoding="utf-8"))
+    assert layout["page_count"] >= 1
+    assert layout["visual_object_count"] >= 1
+    assert layout["producer"] == "Skia/PDF"
+    assert layout["average_words_per_page"] > 0
     spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
     assert spec["tool_routes"]["pdf"] == "playwright_chromium"
     assert spec["source_appendix"]["headers"] == ["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"]
     assert spec["source_appendix"]["rows"][0][2] == "https://example.test/spacex-registry"
+
+
+def test_pdf_layout_density_gate_rejects_multi_page_sparse_reports() -> None:
+    try:
+        _assert_pdf_layout_quality({"page_count": 8, "average_words_per_page": 120})
+    except ValueError as exc:
+        assert "layout density gate" in str(exc)
+    else:  # pragma: no cover - assertion branch
+        raise AssertionError("Sparse multi-page PDFs must fail closed")
 
 
 def test_compile_spec_command_builds_pdf_from_evidence_pack(tmp_path: Path) -> None:

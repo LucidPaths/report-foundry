@@ -5,6 +5,7 @@ Lattice: RF-P2 Claim Traceability; RF-P3 Provider and Renderer Agnosticism; RF-P
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 import shutil
@@ -306,11 +307,65 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     ir_path = out_dir / f"{artifact_stem}.json"
     html_path = out_dir / f"{artifact_stem}.html"
     pdf_path = out_dir / f"{artifact_stem}.pdf"
+    layout_metrics_path = out_dir / f"{artifact_stem}.layout.json"
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
     render_html_pdf_with_chromium(html_path, pdf_path)
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, **visual_paths}
+    layout_metrics = analyze_pdf_layout(pdf_path)
+    _assert_pdf_layout_quality(layout_metrics)
+    layout_metrics_path.write_text(json.dumps(layout_metrics, indent=2), encoding="utf-8")
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, **visual_paths}
+
+
+def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:
+    import fitz
+
+    document = fitz.open(pdf_path)
+    page_metrics: list[dict[str, object]] = []
+    total_words = 0
+    total_images = 0
+    total_drawings = 0
+    for index, page in enumerate(document, 1):
+        text = page.get_text("text")
+        words = re.findall(r"\b\w[\w'-]*\b", text)
+        image_count = len(page.get_images(full=True))
+        drawing_count = len(page.get_drawings())
+        total_words += len(words)
+        total_images += image_count
+        total_drawings += drawing_count
+        page_metrics.append(
+            {
+                "page_number": index,
+                "word_count": len(words),
+                "char_count": len(text),
+                "image_count": image_count,
+                "drawing_count": drawing_count,
+                "visual_object_count": image_count + drawing_count,
+            }
+        )
+    producer = document.metadata.get("producer") or ""
+    return {
+        "page_count": document.page_count,
+        "word_count": total_words,
+        "average_words_per_page": round(total_words / max(document.page_count, 1), 1),
+        "image_count": total_images,
+        "drawing_count": total_drawings,
+        "visual_object_count": total_images + total_drawings,
+        "producer": "Skia/PDF" if "Skia/PDF" in producer else producer,
+        "creator": document.metadata.get("creator") or "",
+        "pages": page_metrics,
+    }
+
+
+def _assert_pdf_layout_quality(metrics: dict[str, object]) -> None:
+    page_count = int(metrics["page_count"])
+    average_words_per_page = float(metrics["average_words_per_page"])
+    if page_count >= 6 and average_words_per_page < 180:
+        raise ValueError(
+            "Rendered PDF failed layout density gate: "
+            f"{page_count} pages, {average_words_per_page} average words/page."
+        )
 
 
 def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:

@@ -38,6 +38,16 @@ def test_render_html_contains_sections_and_citations():
     assert "https://example.com/source" in html
 
 
+def test_render_html_uses_professional_density_and_design_primitives():
+    html = render_html(sample_report())
+
+    assert "page-break-before:always" not in html
+    assert "rf-underlay" in html
+    assert "linear-gradient" in html or "radial-gradient" in html
+    assert "display:grid" in html
+    assert "break-inside:avoid" in html
+
+
 def test_render_pdf_writes_real_pdf(tmp_path: Path):
     out = tmp_path / "report.pdf"
 

@@ -32,20 +32,30 @@ def render_html(report: Report) -> str:
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
         f"<title>{escape(report.title)}</title>",
-        "<style>@page{size:A4;margin:16mm}body{font-family:Inter,system-ui,sans-serif;margin:0;color:#101828;background:#f8fafc}"
-        "main{max-width:900px;margin:auto;background:white;padding:48px;border-radius:24px;box-shadow:0 20px 60px #0001}"
-        "h1{font-size:42px;margin-bottom:4px}.subtitle{color:#667085;font-size:18px}.section{page-break-before:always;margin-top:48px}"
-        ".metric{display:inline-block;border:1px solid #d0d5dd;border-radius:16px;padding:16px 20px;margin:8px;background:#f9fafb}"
-        ".metric strong{font-size:28px;display:block}.claim{border-left:4px solid #7c3aed;padding:12px 16px;background:#f5f3ff;margin:16px 0}"
-        ".citation{font-size:12px;color:#475467;margin-top:8px}.source-url{font-size:11px;word-break:break-all;color:#2563eb}.figure{border:1px dashed #98a2b3;border-radius:16px;padding:18px;margin:18px 0;color:#475467}"
-        "table{border-collapse:collapse;width:100%;margin:16px 0}td,th{border:1px solid #d0d5dd;padding:8px;text-align:left}</style></head><body><main>",
+        "<style>"
+        "@page{size:A4;margin:10mm}"
+        ":root{--ink:#101828;--muted:#667085;--line:#d0d5dd;--violet:#7c3aed;--cyan:#0891b2;--green:#16a34a}"
+        "*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;margin:0;color:var(--ink);background:#0f172a}"
+        ".rf-underlay{position:fixed;inset:0;background:radial-gradient(circle at 12% 10%,#38bdf855,transparent 30%),radial-gradient(circle at 88% 4%,#a78bfa55,transparent 28%),linear-gradient(135deg,#0f172a 0%,#1e293b 42%,#f8fafc 42%,#f8fafc 100%);z-index:-1}"
+        "main{max-width:1080px;margin:0 auto;background:#fffffff2;min-height:100vh;padding:28px 34px;border-left:1px solid #ffffff66;border-right:1px solid #ffffff66}"
+        "header.cover{display:grid;grid-template-columns:1.6fr .8fr;gap:24px;align-items:end;border-bottom:3px solid var(--ink);padding:22px 0 18px;margin-bottom:16px}"
+        "h1{font-size:40px;line-height:1.02;margin:0 0 8px}.subtitle{color:var(--muted);font-size:15px;line-height:1.35}.dateline{font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.08em}"
+        ".section{break-inside:avoid;margin:16px 0;padding:14px 0;border-top:1px solid #e4e7ec}.section h2{font-size:22px;line-height:1.1;margin:0 0 8px}"
+        ".section:nth-of-type(n+3):not(:has(table)):not(:has(figure)){display:grid;grid-template-columns:.34fr 1fr;gap:18px;align-items:start}.section:nth-of-type(n+3) h2{font-size:18px}.section:nth-of-type(n+3) .section-body{columns:2;column-gap:22px}"
+        "p{font-size:12.5px;line-height:1.42;margin:0 0 8px}ul{margin:4px 0 8px 18px;padding:0}li{font-size:12.5px;line-height:1.38;margin:0 0 4px}"
+        ".metric{display:inline-block;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin:6px;background:#f9fafb}.metric strong{font-size:24px;display:block}"
+        ".claim{break-inside:avoid;border-left:4px solid var(--violet);padding:9px 12px;background:#f5f3ff;margin:10px 0;font-size:12px}.citation{font-size:10px;color:#475467;margin-top:6px}.source-url{font-size:9px;word-break:break-all;color:#2563eb}"
+        ".figure{break-inside:avoid;border:1px solid #98a2b3;border-radius:16px;padding:12px;margin:12px 0;background:linear-gradient(180deg,#ffffff,#f8fafc);color:#475467}.figure img{max-width:100%;border-radius:10px;border:1px solid var(--line)}"
+        "table{border-collapse:collapse;width:100%;margin:10px 0;font-size:9px}td,th{border:1px solid var(--line);padding:5px;text-align:left;vertical-align:top}th{background:#eef2ff}</style></head><body><div class='rf-underlay'></div><main><header class='cover'><div>",
         f"<h1>{escape(report.title)}</h1>",
     ]
     if report.subtitle:
         parts.append(f"<p class='subtitle'>{escape(report.subtitle)}</p>")
-    parts.append(f"<p class='citation'>Generated {escape(report.report_date)} by {escape(report.author)}</p>")
+    parts.append("</div><aside>")
+    parts.append(f"<p class='dateline'>Generated {escape(report.report_date)}</p><p class='subtitle'>{escape(report.author)}</p>")
+    parts.append("</aside></header>")
     for section in report.sections:
-        parts.append(f"<section class='section'><h2>{escape(section.title)}</h2>")
+        parts.append(f"<section class='section'><h2>{escape(section.title)}</h2><div class='section-body'>")
         if section.kicker:
             parts.append(f"<p class='subtitle'>{escape(section.kicker)}</p>")
         for block in section.blocks:
@@ -71,7 +81,7 @@ def render_html(report: Report) -> str:
                 for row in block.rows:
                     parts.append("<tr>" + "".join(f"<td>{escape(cell)}</td>" for cell in row) + "</tr>")
                 parts.append("</tbody></table>")
-        parts.append("</section>")
+        parts.append("</div></section>")
     parts.append("</main></body></html>")
     return "".join(parts)
 
