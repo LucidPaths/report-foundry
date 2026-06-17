@@ -97,25 +97,14 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
     assert any(block.type == "figure" and "source-backed" in (block.caption or "") for section in report.sections for block in section.blocks)
 
 
-def test_compile_spec_to_report_requires_renderable_visual_path() -> None:
-    spec = compile_report_spec(make_evidence_pack())
-
-    report = compile_spec_to_report(spec)
-
-    figures = [block for section in report.sections for block in section.blocks if block.type == "figure"]
-    assert figures
-    assert all(figure.path for figure in figures)
-
-
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf", "visual"}
+    assert set(paths) == {"spec", "ir", "html", "pdf"}
     for path in paths.values():
         assert path.exists(), path
         assert path.stat().st_size > 0, path
     assert paths["pdf"].read_bytes().startswith(b"%PDF")
-    assert paths["visual"].suffix == ".png"
     spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
     assert spec["tool_routes"]["pdf"] == "reportlab"
 

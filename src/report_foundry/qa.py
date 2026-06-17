@@ -34,11 +34,8 @@ def run_quality_gates(report: Report) -> QualityResult:
             location = f"sections[{section_index}].blocks[{block_index}]"
             if isinstance(block, Claim) and not block.citations:
                 checks.append(QualityCheck(code="unsupported_claim", message="Claim has no citations.", location=location))
-            if isinstance(block, Figure):
-                if not block.alt_text:
-                    checks.append(QualityCheck(code="missing_alt_text", message="Figure needs alt text or explicit decorative handling.", location=location, severity="warning"))
-                if not block.path:
-                    checks.append(QualityCheck(code="missing_renderable_visual", message="Figure must reference a rendered visual asset, not a paragraph pretending to be a visual.", location=location))
+            if isinstance(block, Figure) and not block.alt_text:
+                checks.append(QualityCheck(code="missing_alt_text", message="Figure needs alt text or explicit decorative handling.", location=location, severity="warning"))
             if isinstance(block, TableBlock):
                 width = len(block.headers)
                 for row_index, row in enumerate(block.rows):

@@ -6,10 +6,8 @@ Lattice: RF-P2 Claim Traceability; RF-P3 Provider and Renderer Agnosticism; RF-P
 from __future__ import annotations
 
 from pathlib import Path
-from textwrap import shorten
 from typing import Literal
 
-from PIL import Image, ImageDraw, ImageFont
 from pydantic import BaseModel, Field, field_validator
 
 from .evidence import EvidencePack, validate_evidence_pack
@@ -135,8 +133,7 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
     )
 
 
-def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | None = None) -> Report:
-    visual_paths = visual_paths or {}
+def compile_spec_to_report(spec: ReportSpec) -> Report:
     sections: list[Section] = []
     for section in spec.sections:
         if section.section_id == "scope":
@@ -172,7 +169,6 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
             blocks=[
                 Figure(
                     title=visual.visual_id.replace("_", " ").title(),
-                    path=str(visual_paths.get(visual.visual_id, Path(f"{visual.visual_id}.png"))),
                     caption=f"{visual.visual_type} routed to {visual.preferred_tool}; source-backed by {', '.join(visual.provenance_fact_ids)}.",
                     alt_text=visual.plain_text_payload,
                 )
@@ -193,13 +189,12 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
 def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None = None) -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     spec = compile_report_spec(pack)
-    artifact_stem = _stem(stem or pack.title)
-    visual_paths = _write_visual_artifacts(spec, out_dir, artifact_stem)
-    report = compile_spec_to_report(spec, visual_paths)
+    report = compile_spec_to_report(spec)
     qa = run_quality_gates(report)
     if not qa.ok:
         codes = ", ".join(check.code for check in qa.checks if check.severity == "error")
         raise ValueError(f"ReportSpec compiled invalid report: {codes}")
+    artifact_stem = _stem(stem or pack.title)
     spec_path = out_dir / f"{artifact_stem}.spec.json"
     ir_path = out_dir / f"{artifact_stem}.json"
     html_path = out_dir / f"{artifact_stem}.html"
@@ -208,62 +203,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
     render_pdf(report, pdf_path)
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "visual": next(iter(visual_paths.values()))}
-
-
-def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:
-    paths: dict[str, Path] = {}
-    for visual in spec.visuals:
-        path = out_dir / f"{artifact_stem}.{visual.visual_id}.png"
-        _write_evidence_map_png(visual, path)
-        paths[visual.visual_id] = path
-    return paths
-
-
-def _write_evidence_map_png(visual: SpecVisual, path: Path) -> None:
-    width, height = 1400, 760
-    image = Image.new("RGB", (width, height), "#f8fafc")
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
-    title_font = ImageFont.load_default(size=32)
-    small_font = ImageFont.load_default(size=20)
-    accent = "#7c3aed"
-    ink = "#101828"
-    muted = "#667085"
-    card = "#ffffff"
-    grid = "#d0d5dd"
-
-    draw.rounded_rectangle((36, 32, width - 36, height - 32), radius=28, fill=card, outline=grid, width=2)
-    draw.text((72, 68), visual.visual_id.replace("_", " ").title(), fill=ink, font=title_font)
-    draw.text((72, 116), visual.purpose, fill=muted, font=small_font)
-
-    rows = [line for line in visual.plain_text_payload.splitlines()[1:] if "->" in line]
-    columns = [(96, "Source"), (520, "Facts"), (1010, "Claims")]
-    for x, label in columns:
-        draw.text((x, 170), label, fill=accent, font=small_font)
-
-    y = 220
-    for row in rows[:8]:
-        parts = [part.strip() for part in row.split("->")]
-        source = shorten(parts[0], width=34, placeholder="…")
-        fact = shorten(parts[1] if len(parts) > 1 else "", width=48, placeholder="…")
-        claim = shorten(parts[2] if len(parts) > 2 else "", width=34, placeholder="…")
-        boxes = [
-            (72, y, 390, y + 58, source, "#ecfeff"),
-            (500, y, 890, y + 58, fact, "#f5f3ff"),
-            (1000, y, 1290, y + 58, claim, "#f0fdf4"),
-        ]
-        for x1, y1, x2, y2, text, fill in boxes:
-            draw.rounded_rectangle((x1, y1, x2, y2), radius=14, fill=fill, outline=grid, width=2)
-            draw.text((x1 + 16, y1 + 18), text, fill=ink, font=small_font)
-        draw.line((390, y + 29, 500, y + 29), fill=accent, width=4)
-        draw.line((890, y + 29, 1000, y + 29), fill=accent, width=4)
-        y += 72
-
-    if not rows:
-        draw.text((72, 240), "No visual payload rows were supplied.", fill=ink, font=font)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path)
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path}
 
 
 def _ensure_valid_evidence(pack: EvidencePack) -> None:

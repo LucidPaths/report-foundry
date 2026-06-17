@@ -12,7 +12,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from .ir import Claim, Figure, MetricCard, Report, TableBlock, TextBlock
 
@@ -51,8 +51,7 @@ def render_html(report: Report) -> str:
                     parts.append(f"<div class='citation'><a href='{url}'>{label}</a> — {quote}</div>")
                 parts.append("</div>")
             elif isinstance(block, Figure):
-                image = f"<img src='{escape(block.path)}' alt='{escape(block.alt_text or block.title)}' style='max-width:100%;border-radius:12px;border:1px solid #d0d5dd'>" if block.path else ""
-                parts.append(f"<figure class='figure'><strong>{escape(block.title)}</strong>{image}<figcaption>{escape(block.caption or block.alt_text or '')}</figcaption></figure>")
+                parts.append(f"<figure class='figure'><strong>{escape(block.title)}</strong><figcaption>{escape(block.caption or block.alt_text or '')}</figcaption></figure>")
             elif isinstance(block, TableBlock):
                 parts.append("<table><thead><tr>" + "".join(f"<th>{escape(h)}</th>" for h in block.headers) + "</tr></thead><tbody>")
                 for row in block.rows:
@@ -89,10 +88,7 @@ def render_pdf(report: Report, output_path: str | Path) -> Path:
                 citation_text = " ".join(f"[{c.source_id}] {c.quote or c.url or ''}" for c in block.citations)
                 story += [Paragraph(f"<b>Claim:</b> {block.text}<br/><font size='8'>{citation_text}</font>", styles["Claim"]), Spacer(1, 4*mm)]
             elif isinstance(block, Figure):
-                story += [Paragraph(f"<b>{block.title}</b>", styles["BodyText"])]
-                if block.path:
-                    story += [Image(block.path, width=160*mm, height=90*mm), Spacer(1, 2*mm)]
-                story += [Paragraph(block.caption or block.alt_text or "", styles["Kicker"]), Spacer(1, 4*mm)]
+                story += [Paragraph(f"<b>{block.title}</b><br/>{block.caption or block.alt_text or ''}", styles["BodyText"]), Spacer(1, 4*mm)]
             elif isinstance(block, TableBlock):
                 table = Table([block.headers] + block.rows, hAlign="LEFT")
                 table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eef2ff")), ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d0d5dd")), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
