@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import html as html_lib
 import json
 import os
 import re
@@ -17,8 +19,17 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen.canvas import Canvas
 
+from report_foundry.evidence import EvidenceClaim, EvidenceFact, EvidencePack, SourceObservation, build_report_from_evidence
+
 OLLAMA_BASE_URL = "https://ollama.com/v1"
 DEFAULT_MODELS = ["glm-5.2", "kimi-k2.7-code"]
+
+SOURCE_URLS = {
+    "aa-glm-5-2": "https://artificialanalysis.ai/models/glm-5-2",
+    "aa-kimi-k2-7-code": "https://artificialanalysis.ai/models/kimi-k2-7-code",
+    "hf-glm-5-2": "https://huggingface.co/zai-org/GLM-5.2/raw/main/README.md",
+    "hf-kimi-k2-7-code": "https://huggingface.co/moonshotai/Kimi-K2.7-Code/raw/main/README.md",
+}
 
 REPORT_SCOPE = {
     "audience": "Lucid + Discord readers who want actionable model-routing signal, not benchmark wallpaper.",
@@ -193,12 +204,62 @@ def ollama_chat(model: str, prompt: str, *, max_tokens: int = 700, attempts: int
     raise RuntimeError(f"Ollama chat failed for {model} after {attempts} attempts: {type(last_error).__name__}")
 
 
-def live_model_ids() -> list[str]:
+def live_model_inventory() -> dict[str, Any]:
     key = load_ollama_key()
     req = urllib.request.Request(f"{OLLAMA_BASE_URL}/models", headers={"Authorization": f"Bearer {key}"})
     with urllib.request.urlopen(req, timeout=30) as response:
-        data = json.load(response)
+        return json.load(response)
+
+
+def live_model_ids() -> list[str]:
+    data = live_model_inventory()
     return [model["id"] for model in data.get("data", []) if "id" in model]
+
+
+def fetch_url_text(url: str) -> str:
+    req = urllib.request.Request(url, headers={"User-Agent": "ReportFoundry/0.1 truthful-evidence-workflow"})
+    with urllib.request.urlopen(req, timeout=45) as response:
+        return response.read().decode("utf-8", "replace")
+
+
+def source_observation(source_id: str, title: str, url: str | None, text: str, extractor: str) -> SourceObservation:
+    return SourceObservation(
+        source_id=source_id,
+        title=title,
+        url=url,
+        observed_at=f"{date.today().isoformat()}T00:00:00Z",
+        content_sha256=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        extractor=extractor,
+    )
+
+
+def normalized_source_text(text: str) -> str:
+    without_tags = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", html_lib.unescape(without_tags)).strip()
+
+
+def require_regex(pattern: str, text: str, *, label: str) -> str:
+    match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    if not match:
+        raise RuntimeError(f"Could not extract {label} from observed source payload")
+    return match.group(1).strip()
+
+
+def aa_index_value(text: str, *, label: str) -> int:
+    return int(require_regex(r"([0-9]+)\s+Artificial Analysis Intelligence Index", text, label=label))
+
+
+def markdown_first_model_value(text: str, benchmark: str) -> str:
+    escaped = re.escape(benchmark)
+    return require_regex(rf"\|{escaped}\|([0-9.]+)\|", text, label=benchmark)
+
+
+def html_second_model_value(text: str, benchmark: str) -> str:
+    escaped = re.escape(benchmark)
+    match = re.search(rf">?\s*{escaped}\s*</td>\s*<td[^>]*>\s*([0-9.]+)\s*</td>\s*<td[^>]*>\s*([0-9.]+)\s*</td>", text, re.IGNORECASE | re.DOTALL)
+    if not match:
+        raise RuntimeError(f"Could not extract {benchmark} second model from observed source payload")
+    return match.group(2).strip()
 
 
 def sanitize_external_text(text: str) -> str:
@@ -290,9 +351,152 @@ def bounded_model_notes(models: list[str], ids: list[str]) -> dict[str, str]:
     return notes
 
 
+def build_mechanical_evidence_pack(models: list[str], inventory: dict[str, Any], source_texts: dict[str, str]) -> tuple[EvidencePack, dict[str, dict[str, Any]]]:
+    inventory_text = json.dumps(inventory, sort_keys=True, ensure_ascii=False)
+    sources: list[SourceObservation] = [
+        source_observation("ollama-models", "Ollama Cloud /v1/models API", f"{OLLAMA_BASE_URL}/models", inventory_text, "ollama-model-inventory")
+    ]
+    for source_id, text in source_texts.items():
+        sources.append(source_observation(source_id, source_title(source_id), SOURCE_URLS[source_id], text, "regex-source-extractor"))
+
+    ids = [model["id"] for model in inventory.get("data", []) if "id" in model]
+    facts: list[EvidenceFact] = []
+    claims: list[EvidenceClaim] = []
+    extracted_models: dict[str, dict[str, Any]] = {}
+
+    for model in models:
+        if model not in ids:
+            raise RuntimeError(f"Ollama model ID missing from live API: {model}")
+        facts.append(
+            EvidenceFact(
+                fact_id=f"{model}:availability",
+                subject=model,
+                predicate="is_live_ollama_model_id",
+                value="true",
+                source_id="ollama-models",
+                quote=model,
+            )
+        )
+        evidence = extract_model_evidence(model, source_texts)
+        extracted_models[model] = evidence
+        facts.extend(model_facts(model, evidence))
+        claims.append(
+            EvidenceClaim(
+                text=f"{model} is a live Ollama Cloud model ID.",
+                fact_ids=[f"{model}:availability"],
+                confidence="high",
+            )
+        )
+        claims.append(
+            EvidenceClaim(
+                text=evidence["recommendation"],
+                fact_ids=[f"{model}:availability", f"{model}:context", f"{model}:aa_index", *[f"{model}:benchmark:{name}" for name in evidence["benchmarks"]]],
+                confidence="medium",
+            )
+        )
+
+    pack = EvidencePack(
+        title="Ollama Cloud Field Brief",
+        subtitle="Mechanically sourced model brief: observed sources -> extracted facts -> supported claims -> PDF.",
+        scope=REPORT_SCOPE,
+        sources=sources,
+        facts=facts,
+        claims=claims,
+        tags=["ollama", "models", "benchmarks", "evidence", "report-foundry"],
+    )
+    return pack, extracted_models
+
+
+def source_title(source_id: str) -> str:
+    return {
+        "aa-glm-5-2": "Artificial Analysis: GLM-5.2",
+        "aa-kimi-k2-7-code": "Artificial Analysis: Kimi K2.7 Code",
+        "hf-glm-5-2": "GLM-5.2 official Hugging Face model card",
+        "hf-kimi-k2-7-code": "Kimi K2.7 Code official Hugging Face model card",
+    }[source_id]
+
+
+def extract_model_evidence(model: str, source_texts: dict[str, str]) -> dict[str, Any]:
+    if model == "glm-5.2":
+        aa_text = normalized_source_text(source_texts["aa-glm-5-2"])
+        hf_text = source_texts["hf-glm-5-2"]
+        benchmarks = {
+            "AIME 2026": float(markdown_first_model_value(hf_text, "AIME 2026")),
+            "GPQA-Diamond": float(markdown_first_model_value(hf_text, "GPQA-Diamond")),
+            "SWE-bench Pro": float(markdown_first_model_value(hf_text, "SWE-bench Pro")),
+            "Terminal Bench 2.1": float(markdown_first_model_value(hf_text, "Terminal Bench 2.1 (Best Reported Harness)")),
+            "MCP-Atlas": float(markdown_first_model_value(hf_text.replace("MCP-Atlas (Public Set)", "MCP-Atlas"), "MCP-Atlas")),
+        }
+        context = require_regex(r"Context window\s+([0-9]+[mk]?)", aa_text, label="GLM context").upper()
+        total_params = require_regex(r"Total parameters\s+([0-9.]+[BTKM]?)", aa_text, label="GLM total parameters")
+        active_params = require_regex(r"Active parameters\s+([0-9.]+[BTKM]?)", aa_text, label="GLM active parameters")
+        return {
+            "display": "GLM-5.2",
+            "tagline": "Context synthesis",
+            "aa_index": aa_index_value(aa_text, label="GLM AA index"),
+            "context": context,
+            "params": f"{total_params} / {active_params} active",
+            "speed": "source-unavailable",
+            "recommendation": "Use GLM-5.2 for repo archaeology, long-context synthesis, and report drafting; verify it in Hermes before changing defaults.",
+            "benchmarks": benchmarks,
+            "claims": [],
+            "sources": ["ollama-models", "aa-glm-5-2", "hf-glm-5-2"],
+        }
+    if model == "kimi-k2.7-code":
+        aa_text = normalized_source_text(source_texts["aa-kimi-k2-7-code"])
+        hf_text = source_texts["hf-kimi-k2-7-code"]
+        benchmarks = {
+            "Kimi Code v2": float(html_second_model_value(hf_text, "Kimi Code Bench v2")),
+            "Program Bench": float(html_second_model_value(hf_text, "Program Bench")),
+            "MLS Bench Lite": float(html_second_model_value(hf_text, "MLS Bench Lite")),
+            "Kimi Claw 24/7": float(html_second_model_value(hf_text, "Kimi Claw 24/7 Bench")),
+            "MCP Atlas": float(html_second_model_value(hf_text, "MCP Atlas")),
+            "MCP Mark Verified": float(html_second_model_value(hf_text, "MCP Mark Verified")),
+        }
+        context = require_regex(r"Context window\s+([0-9]+[mk]?)", aa_text, label="Kimi context").upper()
+        total_params = require_regex(r"Total parameters\s+([0-9.]+[BTKM]?)", aa_text, label="Kimi total parameters")
+        active_params = require_regex(r"Active parameters\s+([0-9.]+[BTKM]?)", aa_text, label="Kimi active parameters")
+        return {
+            "display": "Kimi K2.7 Code",
+            "tagline": "Coding-agent",
+            "aa_index": aa_index_value(aa_text, label="Kimi AA index"),
+            "context": context,
+            "params": f"{total_params} / {active_params} active",
+            "speed": "source-unavailable",
+            "recommendation": "Use Kimi K2.7 Code for coding-agent and MCP/tool-heavy workflows; do not blindly replace the general Kimi alias.",
+            "benchmarks": benchmarks,
+            "claims": [],
+            "sources": ["ollama-models", "aa-kimi-k2-7-code", "hf-kimi-k2-7-code"],
+        }
+    raise ValueError(f"Unsupported model: {model}")
+
+
+def model_facts(model: str, evidence: dict[str, Any]) -> list[EvidenceFact]:
+    facts = [
+        EvidenceFact(fact_id=f"{model}:aa_index", subject=model, predicate="aa_intelligence_index", value=str(evidence["aa_index"]), source_id=evidence["sources"][1], quote=f"Artificial Analysis Intelligence Index {evidence['aa_index']}"),
+        EvidenceFact(fact_id=f"{model}:context", subject=model, predicate="context_window", value=evidence["context"], source_id=evidence["sources"][1], quote=f"Context window {evidence['context'].lower()}"),
+        EvidenceFact(fact_id=f"{model}:params", subject=model, predicate="parameters", value=evidence["params"], source_id=evidence["sources"][1], quote=evidence["params"]),
+    ]
+    for benchmark, value in evidence["benchmarks"].items():
+        facts.append(
+            EvidenceFact(
+                fact_id=f"{model}:benchmark:{benchmark}",
+                subject=model,
+                predicate=f"benchmark:{benchmark}",
+                value=str(value),
+                source_id=evidence["sources"][2],
+                quote=f"{benchmark} {value:g}",
+            )
+        )
+    return facts
+
+
 def build_evidence_pack(models: list[str] | None = None) -> dict[str, Any]:
     models = models or DEFAULT_MODELS
-    ids = live_model_ids()
+    inventory = live_model_inventory()
+    ids = [model["id"] for model in inventory.get("data", []) if "id" in model]
+    source_texts = {source_id: fetch_url_text(url) for source_id, url in SOURCE_URLS.items()}
+    mechanical_pack, extracted_models = build_mechanical_evidence_pack(models, inventory, source_texts)
     missing = [model for model in models if model not in ids]
     if missing:
         raise RuntimeError(f"Ollama model IDs missing from live API: {', '.join(missing)}")
@@ -301,8 +505,9 @@ def build_evidence_pack(models: list[str] | None = None) -> dict[str, Any]:
         "scope": REPORT_SCOPE,
         "toolchain": TOOLCHAIN,
         "live_check": {"endpoint": f"{OLLAMA_BASE_URL}/models", "model_count": len(ids), "models_found": models},
-        "models": {model: MODEL_EVIDENCE[model] for model in models},
+        "models": extracted_models,
         "citations": CITATIONS,
+        "mechanical_evidence": mechanical_pack.model_dump(),
         "llm_notes": bounded_model_notes(models, ids),
         "layout_contract": {
             "llm_role": "bounded commentary only",
@@ -313,51 +518,12 @@ def build_evidence_pack(models: list[str] | None = None) -> dict[str, Any]:
 
 
 def build_report_ir(pack: dict[str, Any], out_json: Path) -> dict[str, Any]:
-    today = pack["generated_at"]
-    models = list(pack["models"].keys())
-    sections: list[dict[str, Any]] = [
-        {
-            "title": "Scope + method",
-            "kicker": "The report is built from a structured evidence pack. The LLM does not design the PDF.",
-            "blocks": [
-                {"type": "text", "text": pack["scope"]["question"]},
-                {"type": "metric", "label": "Live models checked", "value": str(pack["live_check"]["model_count"]), "note": "Queried from Ollama Cloud /v1/models."},
-                {"type": "metric", "label": "Candidate IDs", "value": ", ".join(models), "note": "Exact API IDs, not guessed website names."},
-                {"type": "claim", "text": "The artifact separates data gathering, scope, deterministic layout, and LLM commentary.", "confidence": "high", "verification_status": "supported", "citations": [CITATIONS["ollama-models"]]},
-            ],
-        },
-        {
-            "title": "Toolchain",
-            "kicker": "Eight concrete parts of the pipeline are represented in the evidence pack and final layout.",
-            "blocks": [
-                {"type": "table", "headers": ["Tool", "Role"], "rows": [[t["name"], t["role"]] for t in TOOLCHAIN]},
-            ],
-        },
-    ]
-    for model, evidence in pack["models"].items():
-        sections.append(
-            {
-                "title": evidence["display"],
-                "kicker": evidence["tagline"],
-                "blocks": [
-                    {"type": "text", "text": pack["llm_notes"][model]},
-                    {"type": "metric", "label": "AA Intelligence Index", "value": str(evidence["aa_index"]), "note": "Benchmark snapshot."},
-                    {"type": "metric", "label": "Context", "value": evidence["context"], "note": evidence["params"]},
-                    {"type": "claim", "text": evidence["recommendation"], "confidence": "medium", "verification_status": "supported", "citations": [CITATIONS[s] for s in evidence["sources"]]},
-                ],
-            }
-        )
-    report = {
-        "title": "Ollama Cloud Field Brief",
-        "subtitle": "GLM-5.2 + Kimi K2.7 Code — scoped evidence, deterministic layout, bounded LLM commentary.",
-        "report_date": today,
-        "author": "Report Foundry",
-        "tags": ["ollama", "models", "benchmarks", "discord", "report-foundry"],
-        "sections": sections,
-    }
+    mechanical = EvidencePack.model_validate(pack["mechanical_evidence"])
+    report = build_report_from_evidence(mechanical)
+    data = report.model_dump(mode="json")
     out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-    return report
+    out_json.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return data
 
 
 def wrap_lines(text: str, width: int) -> list[str]:

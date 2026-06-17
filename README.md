@@ -30,7 +30,7 @@ Outputs:
 
 ## Ollama Cloud newsletter path
 
-Generate a live model brief from Ollama Cloud. The script now writes a structured evidence pack, semantic IR, designed HTML preview, deterministic PDF, and Discord-ready attachment message:
+Generate a live model brief from Ollama Cloud. The script now writes a mechanically sourced evidence pack, semantic IR, designed HTML preview, deterministic PDF, and Discord-ready attachment message:
 
 ```bash
 uv run python scripts/ollama_daily_newsletter.py --out-dir .output
@@ -41,13 +41,19 @@ The script expects `OLLAMA_API_KEY` in the environment or in the local Hermes `.
 
 Outputs:
 
-- `.output/ollama_cloud_field_brief.evidence.json` — scope, live checks, sources, benchmark metrics, toolchain, layout contract.
+- `.output/ollama_cloud_field_brief.evidence.json` — scope, live checks, observed sources with hashes, extracted facts, supported claims, benchmark metrics, toolchain, layout contract.
 - `.output/ollama_cloud_field_brief.json` — Report Foundry IR for generic validation/rendering.
 - `.output/ollama_cloud_field_brief_designed.html` — newsletter preview.
 - `.output/ollama_cloud_field_brief_designed.pdf` — polished PDF artifact with scope, pipeline, model cards, benchmark bars, and source footer.
 - `.output/ollama_cloud_field_brief_designed.discord.md` — sanitized Discord message with PDF attachment path.
 
-Contract: the LLM is allowed to generate bounded commentary only. It does not choose report scope, sources, layout, charts, citations, or PDF structure.
+Mechanical contract:
+
+```text
+observed source payload -> SHA-256 source record -> extracted fact -> supported claim -> Report Foundry IR -> PDF
+```
+
+The workflow fails closed when required source data is missing or a claim references an unknown fact. The LLM is allowed to generate bounded commentary only. It does not choose report scope, sources, layout, charts, citations, or PDF structure.
 
 ## Design direction
 
