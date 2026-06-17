@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from datetime import date
@@ -82,7 +83,7 @@ def load_ollama_key() -> str:
     raise RuntimeError("OLLAMA_API_KEY is not available in the environment or Hermes .env")
 
 
-def ollama_chat(model: str, prompt: str, *, max_tokens: int = 1200) -> str:
+def ollama_chat(model: str, prompt: str, *, max_tokens: int = 1200, attempts: int = 3) -> str:
     key = load_ollama_key()
     payload = {
         "model": model,
@@ -94,16 +95,27 @@ def ollama_chat(model: str, prompt: str, *, max_tokens: int = 1200) -> str:
         "max_tokens": max_tokens,
         "stream": False,
     }
-    req = urllib.request.Request(
-        f"{OLLAMA_BASE_URL}/chat/completions",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=90) as response:
-        data = json.load(response)
-    message = data["choices"][0]["message"]
-    return (message.get("content") or message.get("reasoning") or "").strip()
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        req = urllib.request.Request(
+            f"{OLLAMA_BASE_URL}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as response:
+                data = json.load(response)
+            message = data["choices"][0]["message"]
+            content = (message.get("content") or message.get("reasoning") or "").strip()
+            if len(content) < 80:
+                raise RuntimeError(f"short response from {model}")
+            return content
+        except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
+            last_error = exc
+            if attempt < attempts:
+                time.sleep(2 * attempt)
+    raise RuntimeError(f"Ollama chat failed for {model} after {attempts} attempts: {type(last_error).__name__}")
 
 
 def live_model_ids() -> list[str]:
@@ -159,7 +171,7 @@ def build_report(out_json: Path, discord_md: Path, *, models: list[str] | None =
     for model in models:
         try:
             generated[model] = ollama_chat(model, make_prompt(model, MODEL_EVIDENCE[model], ids))
-        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError) as exc:
+        except (urllib.error.URLError, TimeoutError, RuntimeError) as exc:
             generated[model] = f"Live generation failed for {model}: {type(exc).__name__}. Static evidence still indicates: {MODEL_EVIDENCE[model]['positioning']}."
 
     today = date.today().isoformat()
