@@ -28,6 +28,20 @@ Outputs:
 .output/daily_systems_brief.pdf
 ```
 
+## Ollama Cloud newsletter path
+
+Generate a live model brief from Ollama Cloud, then render it through Report Foundry:
+
+```bash
+python scripts/ollama_daily_newsletter.py \
+  --out .output/ollama_cloud_field_brief.json \
+  --discord-md .output/ollama_cloud_field_brief.discord.md
+uv run reportfoundry validate .output/ollama_cloud_field_brief.json
+uv run reportfoundry build .output/ollama_cloud_field_brief.json --out-dir .output
+```
+
+The script expects `OLLAMA_API_KEY` in the environment or in the local Hermes `.env`. It does not print the key.
+
 ## Design direction
 
 The PDF is not the source of truth. The canonical artifact is a semantic report IR with claim-level provenance. Renderers are adapters.
