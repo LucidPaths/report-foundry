@@ -44,7 +44,8 @@ The foundry is the product. AI/search providers are replaceable input capabiliti
 - [ ] reusable theme tokens
 - [ ] section divider components
 - [ ] Plotly/Vega chart adapters
-- [ ] Mermaid diagram adapter
+- [x] Mermaid diagram adapter for strict ReportSpec evidence maps
+- [ ] ExhibitSpec schema for charts, diagrams, tables, and image evidence
 - [ ] cover page variants
 - [ ] visual screenshot QA
 
@@ -58,6 +59,8 @@ The foundry is the product. AI/search providers are replaceable input capabiliti
 
 ## v0.5 AI-native receipts
 
+- [x] professional report content schema: answer-first thesis, key takeaways, conclusion-led sections, so-what, limitations, what-to-watch, methodology
+- [x] OSS landscape/backlog for formatting engines, citation tooling, exhibit tools, and evidence pipeline orchestration
 - [ ] claim extraction
 - [ ] citation entailment verifier
 - [ ] evidence graph
