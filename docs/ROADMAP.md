@@ -1,5 +1,20 @@
 # Roadmap
 
+## Product north star
+
+```text
+user connects their own AI/search key -> user enters keyword -> AI searches -> foundry builds governed report package
+```
+
+The foundry is the product. AI/search providers are replaceable input capabilities.
+
+## v0.0 Foundry intake
+
+- [x] explicit `FoundryRunRequest`: keyword/topic plus user-connected AI/search provider references
+- [x] raw API keys rejected from typed intake models; store references/handles only
+- [ ] connector interface that turns AI/search results into source observations
+- [ ] first real AI/search-backed source acquisition worker
+
 ## v0.1 MVP
 
 - [x] Pydantic report IR
@@ -53,8 +68,9 @@
 - [x] source-plan artifact with primary/trusted source quotas per required dimension
 - [x] visual-plan artifact with chart/map/diagram/image provenance requirements
 - [x] `reportfoundry plan-run` CLI that persists manifest, rubric, source plan, visual plan, and initial gate result
-- [x] `reportfoundry research-run` CLI that normalizes local marked source files into evidence packs and research gate results
-- [x] fail-closed research extraction: missing `DIMENSION:` markers route back to Research
+- [x] fixture adapter: `reportfoundry research-run` normalizes local marked source files into evidence packs and research gate results without external AI/search calls
+- [x] fixture adapter fails closed: missing `DIMENSION:` markers route back to Research
+- [ ] product research worker: user-connected AI/search provider executes source plan and writes source observations
 - [ ] final AI reviewer rubric that reads/looks at generated PDF screenshots and scores against the initial case rubric
 - [ ] iterative department retry loop: failed gate returns the artifact to the responsible department with repair instructions
 

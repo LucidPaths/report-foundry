@@ -1,11 +1,19 @@
 # Report Foundry Architecture
 
-Report Foundry is an AI-operated analyst factory. Deterministic code owns sourcing law, evidence validation, gate routing, rendering, verification, and publishing. Models and connected agents may research, draft, code, and critique, but every output moves through typed handoffs and quality gates.
+Report Foundry is an AI-operated report factory. Users connect their own AI/search provider keys, enter a keyword/topic, and the foundry turns AI search output into a governed report package. Deterministic code owns source law, evidence validation, gate routing, rendering, verification, and publishing. Models and connected agents may search, research, draft, code, and critique, but every output moves through typed handoffs and quality gates.
+
+## Product loop
+
+```text
+user-connected AI/search key -> keyword/topic -> AI search -> source observations -> foundry evidence graph -> report package
+```
+
+The foundry is not the AI provider and not the search provider. Those are replaceable connectors. The foundry owns the invariant: every shipped claim/visual/layout decision must trace back to admissible source observations or fail closed.
 
 ## Pipeline
 
 ```text
-topic/keywords -> case rubric -> source plan -> observed source payloads -> source hashes -> extracted facts -> supported claims -> visual plan -> semantic IR -> assets/charts -> HTML/PDF renderers -> QA score -> delivery
+keyword/topic -> case rubric -> source plan -> AI/search connector calls -> observed source payloads -> source hashes -> extracted facts -> supported claims -> visual plan -> semantic IR -> assets/charts -> HTML/PDF renderers -> QA score -> delivery
 ```
 
 The factory layer is department-oriented:
@@ -38,6 +46,7 @@ Ollama /v1/models + benchmark/model-card sources
 ## Principles
 
 - PDF is an artifact, not the source of truth.
+- User keys are connection inputs, not artifacts: manifests reference provider/key handles or environment variable names, never raw API keys.
 - Topic input is not scope input: the factory must infer what a serious analyst would be negligent to omit, then prove or drop those dimensions.
 - The case-specific rubric is created before research/rendering and becomes the acceptance contract for the run.
 - Claims carry citations at span/block level.

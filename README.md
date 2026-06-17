@@ -1,18 +1,29 @@
 # Report Foundry
 
-AI-native evidence-to-PDF report compiler.
+AI-native report foundry: user-connected AI/search turns a keyword into a grounded report package.
 
-Report Foundry turns structured evidence packs into beautiful, grounded reports with claim-level citations, visual assets, QA gates, and Discord-ready PDF delivery.
+Canonical product loop:
+
+```text
+user connects their own AI/search key
+user enters a keyword/topic
+AI searches and gathers sources
+foundry normalizes sources into evidence
+foundry builds the report package: rubric, facts, claims, visuals, layout, QA, export
+```
+
+Report Foundry is the system that owns source law, evidence validation, gate routing, rendering, verification, and publishing. AI/search providers are connected capabilities; they are not the foundry.
 
 ## What exists now
 
-- Pydantic report IR: sections, text, claims, citations, figures, metric cards, tables
-- Quality gates: unsupported claims, missing alt text warnings, ragged tables
-- HTML renderer for preview/share
-- Real PDF renderer via ReportLab
-- CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and `reportfoundry research-run`
-- Example report fixture
-- Analyst-factory contracts: case rubric, source plan, visual plan, local marked-source research, gate routing
+- Top-level foundry intake contract: keyword/topic plus user-connected AI/search provider references.
+- Pydantic report IR: sections, text, claims, citations, figures, metric cards, tables.
+- Quality gates: unsupported claims, missing alt text warnings, ragged tables.
+- HTML renderer for preview/share.
+- Real PDF renderer via ReportLab.
+- CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and fixture adapter `reportfoundry research-run`.
+- Example report fixture.
+- Analyst-factory contracts: case rubric, source plan, visual plan, gate routing.
 
 ## Quick start
 
@@ -29,9 +40,33 @@ Outputs:
 .output/daily_systems_brief.pdf
 ```
 
+## Foundry run shape
+
+The real product run starts when a user connects their own AI/search provider key and submits a keyword/topic. The key is referenced through environment/config; raw secrets are not stored in run manifests.
+
+```text
+FoundryRunRequest
+  keyword: "current SpaceX IPO launch newsletter"
+  ai: provider + api_key_env_var
+  search: provider + api_key_env_var
+```
+
+Execution target:
+
+```text
+keyword/topic
+  -> AI search over web/user-connected sources
+  -> observed source payloads with hashes
+  -> extracted facts
+  -> supported claims
+  -> visual/layout plan
+  -> QA gates
+  -> export package
+```
+
 ## Factory run planning
 
-Create the first executable factory package from keywords/topic before research starts:
+Create the first executable factory package from a keyword/topic before source acquisition starts:
 
 ```bash
 uv run reportfoundry plan-run "current SpaceX IPO launch newsletter" \
@@ -52,9 +87,9 @@ Outputs:
 
 This is a planning package, not a completed deep-research report. Research/connectors must satisfy the source plan before synthesis/rendering can ship.
 
-### Local marked-source research
+### Fixture adapter: local marked sources
 
-Create an evidence pack from local `.md`/`.txt` files whose claims are explicitly marked against the source plan:
+`research-run` is a development/test adapter, not the product search path. It exists so the foundry can be tested without calling an AI/search provider. It creates an evidence pack from local `.md`/`.txt` files whose claims are explicitly marked against the source plan:
 
 ```bash
 uv run reportfoundry research-run .factory-run/spacex-ipo \

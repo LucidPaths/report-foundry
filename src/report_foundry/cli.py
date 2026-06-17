@@ -40,7 +40,7 @@ def plan_run(
 
 @app.command("research-run")
 def research_run(run_dir: Path, source_dir: Path = typer.Option(..., help="Directory containing .md/.txt marked source files.")) -> None:
-    """Extract evidence from local marked sources into a factory run package."""
+    """Fixture adapter: extract evidence from local marked sources."""
     result = write_research_artifacts(run_dir=run_dir, source_dir=source_dir)
     print(f"[green]research evidence[/green] {run_dir / 'evidence_pack.json'}")
     print(f"route_back={result.gate_result.route_back_department or 'none'} score={result.gate_result.score}")

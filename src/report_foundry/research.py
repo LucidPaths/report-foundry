@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+"""Fixture adapter for local marked sources.
+
+This is not the product AI/search path. It exists to exercise the foundry
+source-observation -> fact -> claim -> gate contract without external calls.
+"""
+
 import hashlib
 from datetime import datetime, timezone
 from pathlib import Path

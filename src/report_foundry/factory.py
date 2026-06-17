@@ -4,7 +4,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .evidence import EvidencePack, validate_evidence_pack
 
@@ -20,6 +20,58 @@ class Department(str, Enum):
 
 
 Severity = Literal["error", "warning"]
+FoundryPipelineStage = Literal[
+    "keyword_intake",
+    "ai_search",
+    "source_observation",
+    "fact_extraction",
+    "claim_synthesis",
+    "visual_layout",
+    "qa_export",
+]
+
+
+class ConnectedProvider(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str
+    api_key_env_var: str
+
+    @field_validator("provider", "api_key_env_var")
+    @classmethod
+    def non_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("provider connection fields must not be empty")
+        return value
+
+
+class FoundryRunRequest(BaseModel):
+    """Top-level product intake: user key reference + keyword/topic enters the foundry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    keyword: str
+    ai: ConnectedProvider
+    search: ConnectedProvider
+    audience: str = "executive readers"
+    pipeline: list[FoundryPipelineStage] = Field(
+        default_factory=lambda: [
+            "keyword_intake",
+            "ai_search",
+            "source_observation",
+            "fact_extraction",
+            "claim_synthesis",
+            "visual_layout",
+            "qa_export",
+        ]
+    )
+
+    @field_validator("keyword", "audience")
+    @classmethod
+    def text_fields_must_not_be_empty(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("foundry intake text fields must not be empty")
+        return value
 
 
 class RubricDimension(BaseModel):
@@ -131,6 +183,26 @@ GENERIC_DIMENSIONS = [
     RubricDimension(name="bull_bear_cases", description="Strongest supporting and skeptical interpretations."),
     RubricDimension(name="implications", description="Actionable implications for the named audience."),
 ]
+
+
+def build_foundry_run_request(
+    *,
+    keyword: str,
+    ai_provider: str,
+    ai_api_key_env_var: str,
+    search_provider: str | None = None,
+    search_api_key_env_var: str | None = None,
+    audience: str = "executive readers",
+) -> FoundryRunRequest:
+    return FoundryRunRequest(
+        keyword=keyword,
+        audience=audience,
+        ai=ConnectedProvider(provider=ai_provider, api_key_env_var=ai_api_key_env_var),
+        search=ConnectedProvider(
+            provider=search_provider or ai_provider,
+            api_key_env_var=search_api_key_env_var or ai_api_key_env_var,
+        ),
+    )
 
 
 def build_case_rubric(topic: str, *, audience: str) -> ReportRubric:
