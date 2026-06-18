@@ -14,6 +14,7 @@ from .ir import Citation, Report
 from .qa import QualityCheck, QualityResult
 
 Confidence = Literal["high", "medium", "low", "unknown"]
+SourceTier = Literal["primary", "trusted_secondary", "secondary", "internal", "unclassified"]
 ProfessionalSectionRole = Literal[
     "market_context",
     "thesis",
@@ -38,6 +39,10 @@ class SourceObservation(BaseModel):
     content_sha256: str
     extractor: str
     locator: str | None = None
+    source_tier: SourceTier = "unclassified"
+    publisher: str | None = None
+    published_at: str | None = None
+    citation_metadata: dict[str, str] = Field(default_factory=dict)
 
     @field_validator("content_sha256")
     @classmethod

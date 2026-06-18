@@ -11,11 +11,43 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .evidence import EvidenceClaim, EvidenceFact, EvidencePack, SourceObservation
 from .factory import FactoryGateResult, PageMetrics, ReportRunManifest, SourcePlan, evaluate_factory_gates
+
+
+class ResearchSourceCandidate(BaseModel):
+    source_id: str
+    path: str
+    decision: Literal["selected", "rejected"]
+    reason: str
+
+
+class ResearchExtractionStep(BaseModel):
+    source_id: str
+    dimension: str
+    fact_id: str
+    extractor: str
+    quote_locator: str
+
+
+class ResearchEvidenceGap(BaseModel):
+    dimension: str
+    reason: str
+    route_back_department: str = "research"
+
+
+class ResearchRunLog(BaseModel):
+    artifact_role: str = "research_run_log: source-selection, extraction, and gap audit trail"
+    run_dir: str
+    source_dir: str
+    source_plan_dimensions: list[str]
+    candidates: list[ResearchSourceCandidate] = Field(default_factory=list)
+    extraction_steps: list[ResearchExtractionStep] = Field(default_factory=list)
+    evidence_gaps: list[ResearchEvidenceGap] = Field(default_factory=list)
 
 
 class ResearchResult(BaseModel):
@@ -23,6 +55,7 @@ class ResearchResult(BaseModel):
     source_plan: SourcePlan
     evidence: EvidencePack
     gate_result: FactoryGateResult
+    run_log: ResearchRunLog
 
 
 def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResult:
@@ -33,8 +66,19 @@ def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResul
     sources: list[SourceObservation] = []
     facts: list[EvidenceFact] = []
     claims: list[EvidenceClaim] = []
+    candidates: list[ResearchSourceCandidate] = []
+    extraction_steps: list[ResearchExtractionStep] = []
+    covered_dimensions: set[str] = set()
     for document in source_documents:
         source = _source_observation(document.path, document.text)
+        candidates.append(
+            ResearchSourceCandidate(
+                source_id=source.source_id,
+                path=str(document.path),
+                decision="selected",
+                reason="local marked source file matched fixture adapter extension",
+            )
+        )
         sources.append(source)
         for item in source_plan.items:
             quote = _extract_dimension_quote(document.text, item.dimension)
@@ -50,6 +94,16 @@ def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResul
                     source_id=source.source_id,
                     quote=quote,
                     locator=f"DIMENSION: {item.dimension}",
+                )
+            )
+            covered_dimensions.add(item.dimension)
+            extraction_steps.append(
+                ResearchExtractionStep(
+                    source_id=source.source_id,
+                    dimension=item.dimension,
+                    fact_id=fact_id,
+                    extractor=source.extractor,
+                    quote_locator=f"DIMENSION: {item.dimension}",
                 )
             )
             claims.append(
@@ -73,18 +127,35 @@ def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResul
         claims=claims,
         tags=["factory-research", manifest.integration_mode],
     )
+    evidence_gaps = [
+        ResearchEvidenceGap(
+            dimension=item.dimension,
+            reason="No selected marked source contained the required DIMENSION marker.",
+        )
+        for item in source_plan.items
+        if item.dimension not in covered_dimensions
+    ]
+    run_log = ResearchRunLog(
+        run_dir=str(run_dir),
+        source_dir=str(source_dir),
+        source_plan_dimensions=[item.dimension for item in source_plan.items],
+        candidates=candidates,
+        extraction_steps=extraction_steps,
+        evidence_gaps=evidence_gaps,
+    )
     gate_result = evaluate_factory_gates(
         manifest,
         evidence,
         pages=[PageMetrics(page_number=1, fill_ratio=0.8, has_source_appendix=True)],
     )
-    return ResearchResult(manifest=manifest, source_plan=source_plan, evidence=evidence, gate_result=gate_result)
+    return ResearchResult(manifest=manifest, source_plan=source_plan, evidence=evidence, gate_result=gate_result, run_log=run_log)
 
 
 def write_research_artifacts(*, run_dir: Path, source_dir: Path) -> ResearchResult:
     result = build_research_evidence(run_dir=run_dir, source_dir=source_dir)
     (run_dir / "evidence_pack.json").write_text(result.evidence.model_dump_json(indent=2), encoding="utf-8")
     (run_dir / "research_gate_result.json").write_text(result.gate_result.model_dump_json(indent=2), encoding="utf-8")
+    (run_dir / "research_run_log.json").write_text(result.run_log.model_dump_json(indent=2), encoding="utf-8")
     return result
 
 
@@ -109,6 +180,9 @@ def _source_observation(path: Path, text: str) -> SourceObservation:
         content_sha256=digest,
         extractor="local_marked_source_v1",
         locator=str(path),
+        source_tier="primary",
+        publisher="local fixture source",
+        citation_metadata={"format": path.suffix.lstrip("."), "path": str(path)},
     )
 
 

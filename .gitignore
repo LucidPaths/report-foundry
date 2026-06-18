@@ -5,4 +5,5 @@ dist/
 build/
 *.egg-info/
 .output/
+.output_*/
 .DS_Store

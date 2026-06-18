@@ -161,6 +161,20 @@ def test_source_and_visual_plans_are_derived_from_case_rubric() -> None:
     assert any("source" in item.acceptance_rule.lower() for item in visual_plan.items)
 
 
+def test_source_tier_quota_is_visible_gate_signal_before_real_connectors() -> None:
+    rubric = build_case_rubric("current SpaceX IPO launch newsletter", audience="executive readers")
+    dimensions = [dimension.name for dimension in rubric.required_dimensions]
+    pack = pack_with_dimensions(dimensions)
+    manifest = ReportRunManifest(topic="current SpaceX IPO launch newsletter", rubric=rubric)
+
+    result = evaluate_factory_gates(manifest, pack, pages=[PageMetrics(page_number=1, fill_ratio=0.75, has_source_appendix=True)])
+
+    tier_checks = [check for check in result.checks if check.code == "insufficient_source_tier"]
+    assert tier_checks
+    assert all(check.department == Department.RESEARCH for check in tier_checks)
+    assert all(check.severity == "warning" for check in tier_checks)
+
+
 def test_write_run_package_persists_manifest_plans_and_initial_gate_result(tmp_path) -> None:
     out_dir = tmp_path / "factory-run"
 

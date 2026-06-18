@@ -111,6 +111,7 @@ Outputs:
 
 - `evidence_pack.json` — observed local source records with SHA-256 hashes, extracted dimension facts, and source-bound claims.
 - `research_gate_result.json` — factory gate result after research coverage. Missing dimension markers route back to Research.
+- `research_run_log.json` — source-selection, extraction-step, and evidence-gap audit trail for the fixture run.
 
 This mode is deterministic and local. It does not discover web sources or claim live facts by itself; it only normalizes marked source files into the evidence contract.
 
@@ -159,17 +160,10 @@ observed source payload -> SHA-256 source record -> extracted fact -> supported 
 
 The workflow fails closed when required source data is missing or a claim references an unknown fact. The LLM is allowed to generate bounded commentary only. It does not choose report scope, sources, layout, charts, citations, or PDF structure.
 
-## Design direction
+## Strategy truth
 
-The PDF is not the source of truth. The canonical artifact is a semantic report IR with claim-level provenance. Renderers are adapters.
+The PDF is not the source of truth. The canonical artifact is a semantic report package with claim-level provenance. Existing research, citation, exhibit, and rendering tools are adapters around Foundry's evidence law.
 
-Current and planned backends:
+The single roadmap and developer handoff is [`docs/DEVELOPER_HANDOFF_ROADMAP.md`](docs/DEVELOPER_HANDOFF_ROADMAP.md). Work from that document first; older roadmap/backlog notes were removed to keep one design north.
 
-- Playwright/Chromium for open-source browser layout and PDF export
-- WeasyPrint for open-source HTML/CSS paged media
-- PrinceXML for premium PDF/A and PDF/UA publishing
-- Playwright screenshots for visual QA
-- Typst for deterministic technical reports
-- Plotly/Vega/Mermaid for chart and diagram assets
-
-See `docs/ARCHITECTURE.md` and `docs/ROADMAP.md`.
+See also `docs/ARCHITECTURE.md` for the current architecture and `docs/PRINCIPLE_LATTICE.md` for governing doctrine.

@@ -411,6 +411,19 @@ def _evidence_contract_checks(evidence: EvidencePack) -> list[FactoryGateCheck]:
 def _research_coverage_checks(rubric: ReportRubric, evidence: EvidencePack) -> list[FactoryGateCheck]:
     predicates = {fact.predicate for fact in evidence.facts}
     checks: list[FactoryGateCheck] = []
+    for tier, required_count in rubric.required_source_tiers.items():
+        if required_count <= 0:
+            continue
+        observed_count = len([source for source in evidence.sources if source.source_tier == tier])
+        if observed_count < required_count:
+            checks.append(
+                FactoryGateCheck(
+                    code="insufficient_source_tier",
+                    message=f"Research source tier quota not met: {tier} requires {required_count}, observed {observed_count}.",
+                    department=Department.RESEARCH,
+                    severity="warning",
+                )
+            )
     for dimension in rubric.required_dimensions:
         if dimension.required and f"dimension:{dimension.name}" not in predicates:
             checks.append(
