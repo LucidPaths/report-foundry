@@ -850,7 +850,7 @@ Verified by audit regression tests and full suite after the step-5 implementatio
 Remaining / not claimed:
 
 - Typst and Pandoc are scaffolded routes only; they do not render documents yet.
-- `write_spec_artifacts` still constructs the renderer-neutral package in-process before calling the renderer adapter; a later package-level CLI can split this into separate run-package stages.
+- `write_spec_artifacts` still constructs the renderer-neutral package in-process before calling the renderer adapter; the package now has a manifest, but a later CLI can split this into separate run-package stages.
 - Renderer-independent gates are currently basic route/gate artifacts plus existing PDF layout checks; citation visibility, required-section visibility, and extracted-PDF text gates can be strengthened in the next QA/package pass.
 
 ---
@@ -872,6 +872,24 @@ RunPackage
   -> QA gates
   -> artifact package
 ```
+
+
+## Fulfilled package manifest seam
+
+Verified after the repo-wide audit and package-stage implementation:
+
+- Added `src/report_foundry/package.py` with `PackageArtifact`, `PackageManifest`, `build_package_manifest`, and `write_package_manifest`.
+- `write_spec_artifacts` now writes `*.package_manifest.json` and returns it under `package_manifest`.
+- The manifest records package id, selected renderer route, run mode, success/failure status, artifact paths/existence, render gate path, source paths, and errors.
+- Unknown renderer routes still fail closed, but now also write a failed package manifest next to `render_gate_result.json`.
+- `compile-spec` reports the package manifest path for successful Playwright runs.
+- Verified with `uv run --extra dev pytest tests/test_package_manifest.py -q`, full suite, compileall, and a real `compile-spec` smoke over a valid EvidencePack.
+
+Remaining / not claimed for this seam:
+
+- No top-level `reportfoundry package` or `reportfoundry run` command yet.
+- `compile-spec` still expects an `EvidencePack`; legacy/basic report JSON belongs to `build`, not `compile-spec`.
+- Typst/Pandoc remain fail-closed scaffold routes.
 
 ## Suggested run package structure
 

@@ -20,9 +20,10 @@ from .factory import RunMode
 from .exhibit_adapters import write_exhibit_artifacts, write_exhibit_manifest
 from .exhibits import ExhibitSpec, exhibit_specs_from_evidence, validate_exhibit_specs
 from .ir import Citation, Claim, Figure, Report, Section, TextBlock
+from .package import build_package_manifest, write_package_manifest
 from .qa import run_quality_gates
 from .render import render_html
-from .renderers import RenderRequest, render_with_route
+from .renderers import RenderRequest, RendererRouteError, render_with_route
 
 RenderTarget = Literal["html", "pdf"]
 ToolRoute = Literal["html_css", "playwright_chromium", "reportlab", "vega_lite", "mermaid", "typst"]
@@ -354,6 +355,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     bibtex_path = out_dir / f"{artifact_stem}.citations.bib"
     source_appendix_path = out_dir / f"{artifact_stem}.source_appendix.md"
     exhibits_manifest_path = out_dir / "exhibits.json"
+    package_manifest_path = out_dir / f"{artifact_stem}.package_manifest.json"
     evidence_path.write_text(pack.model_dump_json(indent=2), encoding="utf-8")
     citation_export = citation_export_from_evidence(pack)
     citations_path.write_text(citation_export.model_dump_json(indent=2), encoding="utf-8")
@@ -364,25 +366,73 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
-    render_artifact = render_with_route(
-        RenderRequest(
-            report_spec_path=spec_path,
-            evidence_pack_path=evidence_path,
-            citation_records_path=citations_path,
-            exhibit_specs_path=exhibits_manifest_path,
-            html_path=html_path,
-            pdf_path=pdf_path,
-            metrics_path=layout_metrics_path,
-            previews_dir=out_dir / f"{artifact_stem}.pages",
-            route=route,
-            out_dir=out_dir,
-            run_mode=RunMode(str(pack.scope.get("run_mode", "fixture"))),
-        )
+    run_mode = RunMode(str(pack.scope.get("run_mode", "fixture")))
+    render_request = RenderRequest(
+        report_spec_path=spec_path,
+        evidence_pack_path=evidence_path,
+        citation_records_path=citations_path,
+        exhibit_specs_path=exhibits_manifest_path,
+        html_path=html_path,
+        pdf_path=pdf_path,
+        metrics_path=layout_metrics_path,
+        previews_dir=out_dir / f"{artifact_stem}.pages",
+        route=route,
+        out_dir=out_dir,
+        run_mode=run_mode,
     )
+    base_artifacts = {
+        "spec": spec_path,
+        "ir": ir_path,
+        "html": html_path,
+        "pdf": pdf_path,
+        "layout_metrics": layout_metrics_path,
+        "page_previews": render_request.previews_dir,
+        "evidence_pack": evidence_path,
+        "render_artifact": render_artifact_path,
+        "citations": citations_path,
+        "csl": csl_path,
+        "bibtex": bibtex_path,
+        "source_appendix": source_appendix_path,
+        "exhibits": exhibits_manifest_path,
+        **visual_paths,
+    }
+    render_gate_result_path = out_dir / "render_gate_result.json"
+    try:
+        render_artifact = render_with_route(render_request)
+    except RendererRouteError as exc:
+        write_package_manifest(
+            build_package_manifest(
+                package_id=artifact_stem,
+                route=route,
+                run_mode=run_mode,
+                status="failed",
+                out_dir=out_dir,
+                artifact_paths={**base_artifacts, "render_gate_result": render_gate_result_path},
+                gates={"render": render_gate_result_path},
+                source_paths=[evidence_path, spec_path, citations_path, exhibits_manifest_path],
+                errors=[str(exc)],
+            ),
+            package_manifest_path,
+        )
+        raise
     render_artifact_path.write_text(render_artifact.model_dump_json(indent=2), encoding="utf-8")
-    page_previews_dir = Path(render_artifact.preview_paths[0]).parent if render_artifact.preview_paths else out_dir / f"{artifact_stem}.pages"
-    render_gate_result_path = Path(render_artifact.gate_result_path or (out_dir / "render_gate_result.json"))
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "render_gate_result": render_gate_result_path, "evidence_pack": evidence_path, "render_artifact": render_artifact_path, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, "exhibits": exhibits_manifest_path, **visual_paths}
+    page_previews_dir = Path(render_artifact.preview_paths[0]).parent if render_artifact.preview_paths else render_request.previews_dir
+    render_gate_result_path = Path(render_artifact.gate_result_path or render_gate_result_path)
+    paths = {**base_artifacts, "page_previews": page_previews_dir, "render_gate_result": render_gate_result_path}
+    write_package_manifest(
+        build_package_manifest(
+            package_id=artifact_stem,
+            route=route,
+            run_mode=run_mode,
+            status="success",
+            out_dir=out_dir,
+            artifact_paths=paths,
+            gates={"render": render_gate_result_path},
+            source_paths=[Path(path) for path in render_artifact.source_paths],
+        ),
+        package_manifest_path,
+    )
+    return {**paths, "package_manifest": package_manifest_path}
 
 
 def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:

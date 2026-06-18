@@ -85,6 +85,7 @@ def compile_draft(
     print(f"[green]report spec[/green] {paths['spec']}")
     print(f"[green]built[/green] {paths['html']}")
     print(f"[green]built[/green] {paths['pdf']}")
+    print(f"[green]package manifest[/green] {paths['package_manifest']}")
     print(f"[green]layout metrics[/green] {paths['layout_metrics']}")
     print(f"[green]page previews[/green] {paths['page_previews']}")
 
@@ -102,6 +103,7 @@ def compile_spec(input: Path, out_dir: Path = Path(".output_spec"), route: str =
     print(f"[green]route[/green]={route}")
     print(f"[green]built[/green] {paths['html']}")
     print(f"[green]built[/green] {paths['pdf']}")
+    print(f"[green]package manifest[/green] {paths['package_manifest']}")
 
 
 @app.command("oss-strategy-report")
@@ -115,6 +117,7 @@ def oss_strategy_report(
     print(f"[green]report spec[/green] {paths['spec']}")
     print(f"[green]built[/green] {paths['html']}")
     print(f"[green]built[/green] {paths['pdf']}")
+    print(f"[green]package manifest[/green] {paths['package_manifest']}")
     print(f"[green]layout metrics[/green] {paths['layout_metrics']}")
     print(f"[green]page previews[/green] {paths['page_previews']}")
 

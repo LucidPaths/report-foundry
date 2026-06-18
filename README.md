@@ -134,7 +134,8 @@ Outputs:
 - `*.layout.json` and `*.pages/` — PDF layout metrics and page previews for QA.
 - `*.citations.json`, `*.citations.csl.json`, `*.citations.bib`, and `*.source_appendix.md` — citation/source appendix sidecars.
 - `exhibits.json` plus `exhibits/*.vega.json` when formal Vega-Lite exhibits are present.
-- `render_gate_result.json` and `*.render_artifact.json` — renderer route result and package artifact manifest.
+- `render_gate_result.json` and `*.render_artifact.json` — renderer route result and renderer artifact manifest.
+- `*.package_manifest.json` — canonical package manifest listing package artifacts, gates, source paths, route, run mode, and success/failure status. The manifest indexes the package; it is returned by the CLI but not listed inside its own `artifacts` map.
 
 This is the first practical version of the foundry toolkit model: LLM/research fills a strict plain-text+structured spec, the foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance. The PDF route uses Chromium as the layout engine; the LLM does not hand-edit PDF geometry.
 
@@ -167,7 +168,7 @@ The workflow fails closed when required source data is missing or a claim refere
 
 ## Strategy truth
 
-The PDF is not the source of truth. The canonical artifact is a semantic report package with claim-level provenance. Existing research, citation, exhibit, and rendering tools are adapters around Foundry's evidence law.
+The PDF is not the source of truth. The canonical artifact is the semantic report package and its `*.package_manifest.json`, with claim-level provenance. Existing research, citation, exhibit, and rendering tools are adapters around Foundry's evidence law.
 
 The single roadmap and developer handoff is [`docs/DEVELOPER_HANDOFF_ROADMAP.md`](docs/DEVELOPER_HANDOFF_ROADMAP.md). Work from that document first; older roadmap/backlog notes were removed to keep one design north.
 
