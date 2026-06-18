@@ -660,6 +660,26 @@ Write failing tests for:
 - Missing provenance blocks product mode.
 - ReportSpec can reference exhibit artifacts without knowing adapter internals.
 
+### Fulfilled in this pass
+
+Verified by `uv run --extra dev pytest -q` -> `62 passed in 16.24s`.
+
+Implemented:
+
+- Added `src/report_foundry/exhibits.py` with `ExhibitKind`, `ExhibitDataPoint`, `ExhibitSpec`, `ExhibitArtifact`, `exhibit_specs_from_evidence`, and `validate_exhibit_specs`.
+- Added `src/report_foundry/exhibit_adapters.py` with the `ExhibitAdapter` protocol, `VegaLiteExhibitAdapter`, `write_exhibit_artifacts`, and `write_exhibit_manifest`.
+- Added `tests/test_exhibits.py` covering missing exhibit fact IDs, unknown exhibit/data fact IDs, Vega-Lite JSON emission with fact-bound data values, and Report IR path/alt-text propagation.
+- `ReportSpec` now carries `exhibits: list[ExhibitSpec]` while keeping existing `SpecVisual` compatibility for renderer IR.
+- `write_spec_artifacts` now emits `exhibits.json` plus `exhibits/<exhibit_id>.vega.json` for Vega-Lite exhibits.
+- Vega-Lite artifact payloads include `data.values[].fact_id` and `usermeta.fact_ids` / `usermeta.transform_provenance` so chart data remains provenance-bearing.
+- Existing Mermaid visual rendering remains on the pre-existing ReportSpec visual path; non-Vega exhibit routes are not treated as fatal in the Vega-Lite artifact writer.
+
+Remaining / not claimed:
+
+- No SVG/PNG export for Vega-Lite is implemented yet; this pass emits renderer-independent `.vega.json` only.
+- Mermaid is not yet a formal `ExhibitAdapter`; it remains supported through the existing visual renderer path until a later adapter pass.
+- Insight semantic validation (`insight makes a claim not backed by facts`) is still structural/provenance-based, not NLP semantic entailment.
+
 ---
 
 ## 5. Add `RendererAdapter` package path with Typst/Pandoc/Playwright split

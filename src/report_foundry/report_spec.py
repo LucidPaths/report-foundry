@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from .citations import citation_export_from_evidence, render_source_appendix_markdown, source_appendix_rows
 from .evidence import EvidencePack, validate_evidence_pack
+from .exhibit_adapters import write_exhibit_artifacts, write_exhibit_manifest
+from .exhibits import ExhibitSpec, exhibit_specs_from_evidence, validate_exhibit_specs
 from .ir import Citation, Claim, Figure, Report, Section, TableBlock, TextBlock
 from .qa import run_quality_gates
 from .render import render_html, render_html_pdf_with_chromium
@@ -69,6 +71,7 @@ class SpecVisual(BaseModel):
     preferred_tool: ToolRoute
     provenance_fact_ids: list[str]
     plain_text_payload: str
+    alt_text: str | None = None
 
     @field_validator("provenance_fact_ids")
     @classmethod
@@ -91,6 +94,7 @@ class ReportSpec(BaseModel):
     tool_routes: dict[RenderTarget, ToolRoute] = Field(default_factory=lambda: {"html": "html_css", "pdf": "playwright_chromium"})
     sections: list[SpecSection]
     visuals: list[SpecVisual]
+    exhibits: list[ExhibitSpec] = Field(default_factory=list)
     source_appendix: SourceAppendix
     source_fact_map: dict[str, list[str]]
     citation_source_map: dict[str, str] = Field(default_factory=dict)
@@ -169,6 +173,11 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
     scope_lines = [f"{key}: {_stringify(value)}" for key, value in pack.scope.items()]
     citation_export = citation_export_from_evidence(pack)
     source_rows = source_appendix_rows(citation_export.records)
+    exhibit_specs = exhibit_specs_from_evidence(pack)
+    exhibit_result = validate_exhibit_specs(exhibit_specs, pack, product_mode=str(pack.scope.get("run_mode", "fixture")) == "product")
+    if not exhibit_result.ok:
+        codes = ", ".join(check.code for check in exhibit_result.checks if check.severity == "error")
+        raise ValueError(f"Invalid exhibit specs: {codes}")
     report_sections = _professional_report_sections(pack)
     if not report_sections:
         report_sections = [
@@ -224,14 +233,15 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
         visuals=[
             *[
                 SpecVisual(
-                    visual_id=exhibit.visual_id,
-                    visual_type=exhibit.visual_type,
-                    purpose=exhibit.purpose,
-                    preferred_tool=exhibit.preferred_tool,
-                    provenance_fact_ids=exhibit.provenance_fact_ids,
-                    plain_text_payload=exhibit.plain_text_payload,
+                    visual_id=exhibit.exhibit_id,
+                    visual_type=exhibit.kind.value if exhibit.kind.value in {"evidence_map", "chart", "matrix", "timeline", "diagram"} else "chart",
+                    purpose=exhibit.insight,
+                    preferred_tool=exhibit.renderer_route,
+                    provenance_fact_ids=exhibit.fact_ids,
+                    plain_text_payload=exhibit.alt_text,
+                    alt_text=exhibit.alt_text,
                 )
-                for exhibit in pack.exhibits
+                for exhibit in exhibit_specs
             ],
             SpecVisual(
                 visual_id="evidence_trace_map",
@@ -242,6 +252,7 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
                 plain_text_payload=_evidence_map_payload(pack),
             ),
         ],
+        exhibits=exhibit_specs,
         source_appendix=SourceAppendix(headers=["Citation", "Title", "URL/Path", "Accessed", "Locator"], rows=source_rows),
         source_fact_map={source.source_id: [fact.fact_id for fact in pack.facts if fact.source_id == source.source_id] for source in pack.sources},
         citation_source_map={record.citation_id: record.source_id for record in citation_export.records},
@@ -294,7 +305,7 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
                     title=visual.visual_id.replace("_", " ").title(),
                     path=visual_paths[visual.visual_id].name if visual.visual_id in visual_paths else None,
                     caption=f"{visual.visual_type} routed to {visual.preferred_tool}; source-backed by {', '.join(visual.provenance_fact_ids)}.",
-                    alt_text=visual.plain_text_payload,
+                    alt_text=visual.alt_text or visual.plain_text_payload,
                 )
                 for visual in spec.visuals
             ],
@@ -322,6 +333,8 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     spec = compile_report_spec(pack)
     artifact_stem = _stem(stem or pack.title)
     visual_paths = _write_visual_artifacts(spec, out_dir, artifact_stem)
+    exhibit_artifacts = write_exhibit_artifacts(spec.exhibits, pack, out_dir / "exhibits")
+    visual_paths.update({artifact.exhibit_id: Path(artifact.vega_json_path) for artifact in exhibit_artifacts if artifact.vega_json_path})
     report = compile_spec_to_report(spec, visual_paths)
     qa = run_quality_gates(report)
     if not qa.ok:
@@ -336,11 +349,13 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     csl_path = out_dir / f"{artifact_stem}.citations.csl.json"
     bibtex_path = out_dir / f"{artifact_stem}.citations.bib"
     source_appendix_path = out_dir / f"{artifact_stem}.source_appendix.md"
+    exhibits_manifest_path = out_dir / "exhibits.json"
     citation_export = citation_export_from_evidence(pack)
     citations_path.write_text(citation_export.model_dump_json(indent=2), encoding="utf-8")
     csl_path.write_text(json.dumps(citation_export.csl_json, indent=2), encoding="utf-8")
     bibtex_path.write_text(citation_export.bibtex or "", encoding="utf-8")
     source_appendix_path.write_text(render_source_appendix_markdown(citation_export.records), encoding="utf-8")
+    write_exhibit_manifest(exhibit_artifacts, exhibits_manifest_path)
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
@@ -349,7 +364,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     _assert_pdf_layout_quality(layout_metrics)
     layout_metrics_path.write_text(json.dumps(layout_metrics, indent=2), encoding="utf-8")
     page_previews_dir = _write_pdf_page_previews(pdf_path, out_dir / f"{artifact_stem}.pages")
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, **visual_paths}
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, "exhibits": exhibits_manifest_path, **visual_paths}
 
 
 def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:
