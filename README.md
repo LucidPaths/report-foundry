@@ -27,6 +27,7 @@ The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LAT
 - CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and fixture adapter `reportfoundry research-run`.
 - Example report fixture.
 - Analyst-factory contracts: case rubric, source plan, visual plan, worker plan, gate routing.
+- ResearchIntake contract: schema-only LLM researcher prompt, structured full-report intake JSON, validation, and conversion to EvidencePack.
 
 ## Quick start
 
@@ -66,6 +67,37 @@ keyword/topic
   -> QA gates
   -> export package
 ```
+
+
+## Strict ResearchIntake for LLM researchers
+
+The LLM researcher is allowed to decide what sources, facts, claims, sections, contradictions, uncertainty notes, and exhibit proposals matter for the operator-provided keyword. It is not allowed to free-write an unstructured report or invent its own output shape.
+
+Generate the schema-only prompt for the researcher:
+
+```bash
+uv run reportfoundry research-intake-prompt --output prompts/research_intake_system.md
+```
+
+Compile strict LLM output into the Foundry pipeline:
+
+```bash
+uv run reportfoundry compile-intake research_intake.json --out-dir .output_intake
+```
+
+`ResearchIntake` is a structured full-report proposal. Foundry validates references before trust:
+
+```text
+operator keyword/request
+  -> LLM researcher returns ResearchIntake JSON only
+  -> Foundry validates sources/facts/claims/sections/exhibits
+  -> EvidencePack
+  -> ReportSpec
+  -> package manifest
+  -> renderer + QA gates
+```
+
+The prompt/schema intentionally contain no prefilled topic, URL, source ID, fact ID, claim ID, or example source. Runtime inputs fill those blanks.
 
 ## Factory run planning
 

@@ -891,6 +891,24 @@ Remaining / not claimed for this seam:
 - `compile-spec` still expects an `EvidencePack`; legacy/basic report JSON belongs to `build`, not `compile-spec`.
 - Typst/Pandoc remain fail-closed scaffold routes.
 
+
+## Fulfilled ResearchIntake seam
+
+Verified after the package-manifest pass:
+
+- Added `src/report_foundry/research_intake.py` with `ResearchIntake`, `ResearchRequest`, structured claims/sections, validation errors, prompt generation, and `research_intake_to_evidence_pack`.
+- Added `compile-intake` CLI so strict LLM researcher JSON enters the normal EvidencePack -> ReportSpec -> package manifest -> renderer pipeline.
+- Added `research-intake-prompt` CLI to emit the schema-only system prompt for the researcher.
+- The prompt requires the full report to live inside JSON fields and forbids prose outside the JSON object.
+- Tests assert the prompt/schema contain no prefilled topic, URL, source ID, fact ID, claim ID, SpaceX/IPO-style drift, or example source.
+- Tests assert valid intake converts to `EvidencePack`, and unknown source/fact/claim support fails closed before rendering.
+
+Remaining / not claimed for this seam:
+
+- No live LLM/deep-research provider call is wired yet. This is the deterministic intake law and software bridge.
+- No automatic source fetching/hashing adapter is implemented in this seam; the LLM/intake payload must supply observed source metadata.
+- Prompt evaluation against real model outputs is still future work.
+
 ## Suggested run package structure
 
 ```text

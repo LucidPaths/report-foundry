@@ -8,6 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import typer
+from pydantic import ValidationError
 from rich import print
 
 from .draft import parse_markdown_draft_file
@@ -16,6 +17,7 @@ from .ir import Report
 from .evidence import EvidencePack
 from .qa import run_quality_gates
 from .research import write_research_artifacts
+from .research_intake import IntakeValidationError, ResearchIntake, build_research_intake_system_prompt, research_intake_to_evidence_pack
 from .render import render_html, render_pdf
 from .renderers import RendererRouteError
 from .report_spec import write_spec_artifacts
@@ -99,6 +101,39 @@ def compile_spec(input: Path, out_dir: Path = Path(".output_spec"), route: str =
     except RendererRouteError as exc:
         print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
+    print(f"[green]report spec[/green] {paths['spec']}")
+    print(f"[green]route[/green]={route}")
+    print(f"[green]built[/green] {paths['html']}")
+    print(f"[green]built[/green] {paths['pdf']}")
+    print(f"[green]package manifest[/green] {paths['package_manifest']}")
+
+
+@app.command("research-intake-prompt")
+def research_intake_prompt(output: Path = typer.Option(..., help="Path to write the strict research-intake system prompt.")) -> None:
+    """Write the schema-only LLM researcher prompt used before EvidencePack normalization."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(build_research_intake_system_prompt(), encoding="utf-8")
+    print(f"[green]research intake prompt[/green] {output}")
+
+
+@app.command("compile-intake")
+def compile_intake(input: Path, out_dir: Path = Path(".output_intake"), route: str = typer.Option("playwright_chromium", help="Renderer route: playwright_chromium, typst, or pandoc.")) -> None:
+    """Compile strict LLM ResearchIntake JSON into EvidencePack, ReportSpec, and package artifacts."""
+    try:
+        intake = ResearchIntake.model_validate_json(input.read_text(encoding="utf-8"))
+        pack = research_intake_to_evidence_pack(intake)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        evidence_path = out_dir / f"{input.stem}.evidence.json"
+        evidence_path.write_text(pack.model_dump_json(indent=2), encoding="utf-8")
+        paths = write_spec_artifacts(pack, out_dir, stem=input.stem, route=route)
+    except (IntakeValidationError, ValidationError, ValueError) as exc:
+        print(f"[red]invalid research intake[/red]: {exc}")
+        raise typer.Exit(1) from exc
+    except RendererRouteError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    print(f"[green]research intake[/green] {input}")
+    print(f"[green]evidence pack[/green] {evidence_path}")
     print(f"[green]report spec[/green] {paths['spec']}")
     print(f"[green]route[/green]={route}")
     print(f"[green]built[/green] {paths['html']}")
