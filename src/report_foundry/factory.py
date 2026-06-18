@@ -11,6 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .citations import citation_gate_checks
 from .evidence import EvidencePack, validate_evidence_pack
 
 
@@ -400,6 +401,7 @@ def write_run_package(
 def evaluate_factory_gates(manifest: ReportRunManifest, evidence: EvidencePack, *, pages: list[PageMetrics]) -> FactoryGateResult:
     checks: list[FactoryGateCheck] = []
     checks.extend(_evidence_contract_checks(evidence))
+    checks.extend(_citation_contract_checks(evidence, product_mode=manifest.run_mode == RunMode.PRODUCT))
     checks.extend(_research_coverage_checks(manifest.rubric, evidence, run_mode=manifest.run_mode))
     checks.extend(_synthesis_checks(manifest.rubric, evidence))
     checks.extend(_layout_checks(manifest.rubric, pages))
@@ -416,6 +418,13 @@ def _evidence_contract_checks(evidence: EvidencePack) -> list[FactoryGateCheck]:
         for check in result.checks
     ]
 
+
+
+def _citation_contract_checks(evidence: EvidencePack, *, product_mode: bool) -> list[FactoryGateCheck]:
+    return [
+        FactoryGateCheck(code=check.code, message=check.message, department=Department.RESEARCH, severity=check.severity)
+        for check in citation_gate_checks(evidence, product_mode=product_mode)
+    ]
 
 def _research_coverage_checks(rubric: ReportRubric, evidence: EvidencePack, *, run_mode: RunMode = RunMode.FIXTURE) -> list[FactoryGateCheck]:
     predicates = {fact.predicate for fact in evidence.facts}

@@ -513,6 +513,25 @@ Write failing tests for:
 - Rendered report shows human-usable citations, not only hashes/IDs.
 - CSL JSON export is valid enough for Pandoc/citeproc integration.
 
+### Fulfilled in this pass
+
+Verified by `uv run --extra dev pytest -q` -> `58 passed in 13.81s`.
+
+Implemented:
+
+- Added `src/report_foundry/citations.py` with `CitationRecord`, `CitationExport`, `citation_records_from_evidence`, `export_csl_json`, `export_bibtex`, and `render_source_appendix_markdown`.
+- Added `tests/test_citations.py` covering hash retention, reader-facing appendix output, CSL JSON export, BibTeX export, duplicate citation IDs, and product citation gates.
+- `ReportSpec.source_appendix` now uses citation IDs and reader fields (`Citation`, `Title`, `URL/Path`, `Accessed`, `Locator`) instead of raw source hash columns.
+- `ReportSpec.citation_source_map` preserves the internal citation-ID -> source-ID bridge so claim citations still resolve to source-backed facts.
+- `write_spec_artifacts` now emits `*.citations.json`, `*.citations.csl.json`, `*.citations.bib`, and `*.source_appendix.md` alongside spec/IR/HTML/PDF artifacts.
+- Factory gates now include citation contract checks; product mode promotes missing reader URL/path/locator to an error while fixture mode treats it as a warning.
+- Source appendix Markdown deliberately keeps full hashes out of the reader-primary citation surface while preserving `content_sha256` in `citations.json`.
+
+Remaining / not claimed:
+
+- No external Pandoc/citeproc/Citation.js process is invoked yet; CSL JSON/BibTeX are handoff artifacts for a later adapter.
+- Rendered-source-appendix visibility is covered by emitted Markdown and ReportSpec/IR report citations; a dedicated visual/PDF assertion for the appendix page can be strengthened when renderer adapter contracts are split out.
+
 ---
 
 ## 4. Add `ExhibitSpec` with Vega-Lite as first chart adapter

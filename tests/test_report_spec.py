@@ -179,7 +179,8 @@ def test_compile_report_spec_is_strict_tool_feed() -> None:
     assert all(section.blocks for section in spec.sections)
     assert all(claim.fact_ids for section in spec.sections for claim in section.claims)
     assert spec.visuals[0].provenance_fact_ids == ["fact_starlink", "fact_launch"]
-    assert spec.source_appendix.rows[0][0] == "src_spacex_registry"
+    assert spec.source_appendix.rows[0][0] == "cite_src_spacex_registry"
+    assert spec.citation_source_map["cite_src_spacex_registry"] == "src_spacex_registry"
 
 
 def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> None:
@@ -200,7 +201,7 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews"}
+    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews", "citations", "csl", "bibtex", "source_appendix"}
     for key, path in paths.items():
         assert path.exists(), (key, path)
         if path.is_file():
@@ -218,8 +219,11 @@ def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path
     assert (paths["page_previews"] / "page_001.png").exists()
     spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
     assert spec["tool_routes"]["pdf"] == "playwright_chromium"
-    assert spec["source_appendix"]["headers"] == ["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"]
+    assert spec["source_appendix"]["headers"] == ["Citation", "Title", "URL/Path", "Accessed", "Locator"]
     assert spec["source_appendix"]["rows"][0][2] == "https://example.test/spacex-registry"
+    assert "content_sha256" in json.loads(paths["citations"].read_text(encoding="utf-8"))["records"][0]
+    assert "c" * 16 not in paths["source_appendix"].read_text(encoding="utf-8")
+    assert "https://example.test/spacex-registry" in paths["source_appendix"].read_text(encoding="utf-8")
 
 
 def test_pdf_layout_density_gate_rejects_multi_page_sparse_reports() -> None:

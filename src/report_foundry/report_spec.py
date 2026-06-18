@@ -14,6 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from .citations import citation_export_from_evidence, render_source_appendix_markdown, source_appendix_rows
 from .evidence import EvidencePack, validate_evidence_pack
 from .ir import Citation, Claim, Figure, Report, Section, TableBlock, TextBlock
 from .qa import run_quality_gates
@@ -92,6 +93,7 @@ class ReportSpec(BaseModel):
     visuals: list[SpecVisual]
     source_appendix: SourceAppendix
     source_fact_map: dict[str, list[str]]
+    citation_source_map: dict[str, str] = Field(default_factory=dict)
     fact_details: dict[str, SpecFact]
     generation_metadata: dict[str, str] = Field(default_factory=dict)
 
@@ -165,10 +167,8 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
         for index, claim in enumerate(pack.claims)
     ]
     scope_lines = [f"{key}: {_stringify(value)}" for key, value in pack.scope.items()]
-    source_rows = [
-        [source.source_id, source.title, source.url or "", source.observed_at, source.content_sha256[:16] + "…", source.extractor]
-        for source in pack.sources
-    ]
+    citation_export = citation_export_from_evidence(pack)
+    source_rows = source_appendix_rows(citation_export.records)
     report_sections = _professional_report_sections(pack)
     if not report_sections:
         report_sections = [
@@ -242,8 +242,9 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
                 plain_text_payload=_evidence_map_payload(pack),
             ),
         ],
-        source_appendix=SourceAppendix(headers=["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"], rows=source_rows),
+        source_appendix=SourceAppendix(headers=["Citation", "Title", "URL/Path", "Accessed", "Locator"], rows=source_rows),
         source_fact_map={source.source_id: [fact.fact_id for fact in pack.facts if fact.source_id == source.source_id] for source in pack.sources},
+        citation_source_map={record.citation_id: record.source_id for record in citation_export.records},
         fact_details={fact.fact_id: SpecFact(**fact.model_dump()) for fact in pack.facts},
         generation_metadata={
             "run_mode": str(pack.scope.get("run_mode", "fixture")),
@@ -331,6 +332,15 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     html_path = out_dir / f"{artifact_stem}.html"
     pdf_path = out_dir / f"{artifact_stem}.pdf"
     layout_metrics_path = out_dir / f"{artifact_stem}.layout.json"
+    citations_path = out_dir / f"{artifact_stem}.citations.json"
+    csl_path = out_dir / f"{artifact_stem}.citations.csl.json"
+    bibtex_path = out_dir / f"{artifact_stem}.citations.bib"
+    source_appendix_path = out_dir / f"{artifact_stem}.source_appendix.md"
+    citation_export = citation_export_from_evidence(pack)
+    citations_path.write_text(citation_export.model_dump_json(indent=2), encoding="utf-8")
+    csl_path.write_text(json.dumps(citation_export.csl_json, indent=2), encoding="utf-8")
+    bibtex_path.write_text(citation_export.bibtex or "", encoding="utf-8")
+    source_appendix_path.write_text(render_source_appendix_markdown(citation_export.records), encoding="utf-8")
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
@@ -339,7 +349,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     _assert_pdf_layout_quality(layout_metrics)
     layout_metrics_path.write_text(json.dumps(layout_metrics, indent=2), encoding="utf-8")
     page_previews_dir = _write_pdf_page_previews(pdf_path, out_dir / f"{artifact_stem}.pages")
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, **visual_paths}
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, **visual_paths}
 
 
 def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:
@@ -475,7 +485,8 @@ def _citations_for_claim(spec: ReportSpec, claim: SpecClaim) -> list[Citation]:
     citations: list[Citation] = []
     claim_fact_ids = set(claim.fact_ids)
     for source_row in spec.source_appendix.rows:
-        source_id = source_row[0]
+        citation_id = source_row[0]
+        source_id = spec.citation_source_map.get(citation_id, citation_id)
         source_fact_ids = [fact_id for fact_id in spec.source_fact_map.get(source_id, []) if fact_id in claim_fact_ids]
         if source_fact_ids:
             quotes = [spec.fact_details[fact_id].quote for fact_id in source_fact_ids if fact_id in spec.fact_details]

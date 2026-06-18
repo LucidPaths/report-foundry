@@ -162,6 +162,27 @@ def test_source_and_visual_plans_are_derived_from_case_rubric() -> None:
     assert any("source" in item.acceptance_rule.lower() for item in visual_plan.items)
 
 
+
+def test_product_mode_promotes_missing_reader_citation_locator_to_factory_error() -> None:
+    evidence = pack_with_dimensions(["mechanism"])
+    evidence.sources[0].url = None
+    rubric = build_case_rubric("generic topic", audience="executive readers")
+
+    fixture_result = evaluate_factory_gates(
+        ReportRunManifest(topic="generic topic", rubric=rubric, run_mode=RunMode.FIXTURE),
+        evidence,
+        pages=[PageMetrics(page_number=1, fill_ratio=0.8, has_source_appendix=True)],
+    )
+    product_result = evaluate_factory_gates(
+        ReportRunManifest(topic="generic topic", rubric=rubric, run_mode=RunMode.PRODUCT),
+        evidence,
+        pages=[PageMetrics(page_number=1, fill_ratio=0.8, has_source_appendix=True)],
+    )
+
+    assert any(check.code == "citation_missing_reader_locator" and check.severity == "warning" for check in fixture_result.checks)
+    assert any(check.code == "citation_missing_reader_locator" and check.severity == "error" for check in product_result.checks)
+    assert product_result.route_back_department == Department.RESEARCH
+
 def test_source_tier_quota_is_visible_gate_signal_before_real_connectors() -> None:
     rubric = build_case_rubric("current SpaceX IPO launch newsletter", audience="executive readers")
     dimensions = [dimension.name for dimension in rubric.required_dimensions]
