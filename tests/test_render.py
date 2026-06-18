@@ -56,3 +56,18 @@ def test_render_pdf_writes_real_pdf(tmp_path: Path):
     assert out.exists()
     assert out.read_bytes().startswith(b"%PDF")
     assert out.stat().st_size > 1000
+
+
+
+def test_readme_quickstart_example_validates_and_builds(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+    from report_foundry.cli import app
+
+    runner = CliRunner()
+    validate = runner.invoke(app, ["validate", "examples/daily_systems_brief.json"])
+    assert validate.exit_code == 0, validate.output
+
+    build = runner.invoke(app, ["build", "examples/daily_systems_brief.json", "--out-dir", str(tmp_path / "built")])
+    assert build.exit_code == 0, build.output
+    assert (tmp_path / "built" / "daily_systems_brief.html").exists()
+    assert (tmp_path / "built" / "daily_systems_brief.pdf").exists()

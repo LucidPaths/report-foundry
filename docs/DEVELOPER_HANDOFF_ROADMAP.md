@@ -837,6 +837,16 @@ Implemented:
 - Unknown routes and unavailable Typst/Pandoc routes write `render_gate_result.json` with a concrete failure code instead of silently succeeding.
 - Renderer tests prove the evidence pack file is unchanged by rendering.
 
+
+### Audit correction after repo-wide verification
+
+Verified by audit regression tests and full suite after the step-5 implementation:
+
+- `write_spec_artifacts` now persists the evidence input as `*.evidence.json` and the renderer return value as `*.render_artifact.json`.
+- `RenderArtifact.source_paths` now includes the persisted evidence sidecar instead of silently omitting a non-existent evidence path.
+- CLI renderer route failures now print a clean error and write `render_gate_result.json` instead of dumping a Python traceback.
+- The README quickstart sample validates/builds under current visual QA law.
+
 Remaining / not claimed:
 
 - Typst and Pandoc are scaffolded routes only; they do not render documents yet.

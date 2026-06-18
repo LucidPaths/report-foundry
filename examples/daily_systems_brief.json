@@ -18,7 +18,6 @@
             {"source_id": "src1", "url": "https://example.com/source", "title": "Example source", "quote": "citations are preserved"}
           ]
         },
-        {"type": "figure", "title": "Signal map", "caption": "Vector-first visual slot for future chart/diagram adapters.", "alt_text": "A placeholder signal map"},
         {"type": "table", "caption": "Renderer matrix", "headers": ["Backend", "Use"], "rows": [["ReportLab", "MVP PDF export"], ["WeasyPrint", "future paged-media adapter"], ["PrinceXML", "future premium adapter"]]}
       ]
     }

@@ -21,7 +21,8 @@ from report_foundry.evidence import (
     ReportNarrativeSection,
     SourceObservation,
 )
-from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts, _assert_pdf_layout_quality
+from report_foundry.renderers import _assert_pdf_layout_quality
+from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts
 
 runner = CliRunner()
 
@@ -201,7 +202,7 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews", "citations", "csl", "bibtex", "source_appendix", "exhibits", "render_gate_result"}
+    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews", "citations", "csl", "bibtex", "source_appendix", "exhibits", "render_gate_result", "evidence_pack", "render_artifact"}
     for key, path in paths.items():
         assert path.exists(), (key, path)
         if path.is_file():
@@ -224,6 +225,11 @@ def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path
     assert "content_sha256" in json.loads(paths["citations"].read_text(encoding="utf-8"))["records"][0]
     assert "c" * 16 not in paths["source_appendix"].read_text(encoding="utf-8")
     assert "https://example.test/spacex-registry" in paths["source_appendix"].read_text(encoding="utf-8")
+    assert paths["evidence_pack"].exists()
+    assert json.loads(paths["evidence_pack"].read_text(encoding="utf-8"))["title"] == "SpaceX IPO readiness brief"
+    render_artifact = json.loads(paths["render_artifact"].read_text(encoding="utf-8"))
+    assert render_artifact["route"] == "playwright_chromium"
+    assert str(paths["evidence_pack"]) in render_artifact["source_paths"]
 
 
 def test_pdf_layout_density_gate_rejects_multi_page_sparse_reports() -> None:

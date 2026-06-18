@@ -141,3 +141,19 @@ def test_compile_spec_cli_accepts_explicit_playwright_route(tmp_path: Path) -> N
     assert "route=playwright_chromium" in result.output
     assert (out_dir / "render_gate_result.json").exists()
     assert json.loads((out_dir / "render_gate_result.json").read_text(encoding="utf-8"))["ok"] is True
+
+
+
+def test_compile_spec_cli_route_failures_are_clean_and_write_gate(tmp_path: Path) -> None:
+    evidence_path = tmp_path / "evidence_pack.json"
+    out_dir = tmp_path / "compiled"
+    evidence_path.write_text(make_evidence_pack().model_dump_json(indent=2), encoding="utf-8")
+
+    result = runner.invoke(app, ["compile-spec", str(evidence_path), "--route", "bogus", "--out-dir", str(out_dir)])
+
+    assert result.exit_code == 1
+    assert "Unknown renderer route: bogus" in result.output
+    assert "Traceback" not in result.output
+    gate = json.loads((out_dir / "render_gate_result.json").read_text(encoding="utf-8"))
+    assert gate["ok"] is False
+    assert gate["checks"][0]["code"] == "unknown_renderer_route"

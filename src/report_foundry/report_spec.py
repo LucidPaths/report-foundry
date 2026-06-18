@@ -19,7 +19,7 @@ from .evidence import EvidencePack, validate_evidence_pack
 from .factory import RunMode
 from .exhibit_adapters import write_exhibit_artifacts, write_exhibit_manifest
 from .exhibits import ExhibitSpec, exhibit_specs_from_evidence, validate_exhibit_specs
-from .ir import Citation, Claim, Figure, Report, Section, TableBlock, TextBlock
+from .ir import Citation, Claim, Figure, Report, Section, TextBlock
 from .qa import run_quality_gates
 from .render import render_html
 from .renderers import RenderRequest, render_with_route
@@ -347,11 +347,14 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     html_path = out_dir / f"{artifact_stem}.html"
     pdf_path = out_dir / f"{artifact_stem}.pdf"
     layout_metrics_path = out_dir / f"{artifact_stem}.layout.json"
+    evidence_path = out_dir / f"{artifact_stem}.evidence.json"
+    render_artifact_path = out_dir / f"{artifact_stem}.render_artifact.json"
     citations_path = out_dir / f"{artifact_stem}.citations.json"
     csl_path = out_dir / f"{artifact_stem}.citations.csl.json"
     bibtex_path = out_dir / f"{artifact_stem}.citations.bib"
     source_appendix_path = out_dir / f"{artifact_stem}.source_appendix.md"
     exhibits_manifest_path = out_dir / "exhibits.json"
+    evidence_path.write_text(pack.model_dump_json(indent=2), encoding="utf-8")
     citation_export = citation_export_from_evidence(pack)
     citations_path.write_text(citation_export.model_dump_json(indent=2), encoding="utf-8")
     csl_path.write_text(json.dumps(citation_export.csl_json, indent=2), encoding="utf-8")
@@ -364,7 +367,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     render_artifact = render_with_route(
         RenderRequest(
             report_spec_path=spec_path,
-            evidence_pack_path=out_dir / f"{artifact_stem}.evidence.json",
+            evidence_pack_path=evidence_path,
             citation_records_path=citations_path,
             exhibit_specs_path=exhibits_manifest_path,
             html_path=html_path,
@@ -376,70 +379,10 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
             run_mode=RunMode(str(pack.scope.get("run_mode", "fixture"))),
         )
     )
+    render_artifact_path.write_text(render_artifact.model_dump_json(indent=2), encoding="utf-8")
     page_previews_dir = Path(render_artifact.preview_paths[0]).parent if render_artifact.preview_paths else out_dir / f"{artifact_stem}.pages"
     render_gate_result_path = Path(render_artifact.gate_result_path or (out_dir / "render_gate_result.json"))
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "render_gate_result": render_gate_result_path, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, "exhibits": exhibits_manifest_path, **visual_paths}
-
-
-def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:
-    import fitz
-
-    document = fitz.open(pdf_path)
-    page_metrics: list[dict[str, object]] = []
-    total_words = 0
-    total_images = 0
-    total_drawings = 0
-    for index, page in enumerate(document, 1):
-        text = page.get_text("text")
-        words = re.findall(r"\b\w[\w'-]*\b", text)
-        image_count = len(page.get_images(full=True))
-        drawing_count = len(page.get_drawings())
-        total_words += len(words)
-        total_images += image_count
-        total_drawings += drawing_count
-        page_metrics.append(
-            {
-                "page_number": index,
-                "word_count": len(words),
-                "char_count": len(text),
-                "image_count": image_count,
-                "drawing_count": drawing_count,
-                "visual_object_count": image_count + drawing_count,
-            }
-        )
-    producer = document.metadata.get("producer") or ""
-    return {
-        "page_count": document.page_count,
-        "word_count": total_words,
-        "average_words_per_page": round(total_words / max(document.page_count, 1), 1),
-        "image_count": total_images,
-        "drawing_count": total_drawings,
-        "visual_object_count": total_images + total_drawings,
-        "producer": "Skia/PDF" if "Skia/PDF" in producer else producer,
-        "creator": document.metadata.get("creator") or "",
-        "pages": page_metrics,
-    }
-
-
-def _write_pdf_page_previews(pdf_path: Path, previews_dir: Path) -> Path:
-    import fitz
-
-    previews_dir.mkdir(parents=True, exist_ok=True)
-    document = fitz.open(pdf_path)
-    for index, page in enumerate(document, 1):
-        pixmap = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5), alpha=False)
-        pixmap.save(previews_dir / f"page_{index:03d}.png")
-    return previews_dir
-
-
-def _assert_pdf_layout_quality(metrics: dict[str, object]) -> None:
-    page_count = int(metrics["page_count"])
-    average_words_per_page = float(metrics["average_words_per_page"])
-    if page_count >= 6 and average_words_per_page < 180:
-        raise ValueError(
-            "Rendered PDF failed layout density gate: "
-            f"{page_count} pages, {average_words_per_page} average words/page."
-        )
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "render_gate_result": render_gate_result_path, "evidence_pack": evidence_path, "render_artifact": render_artifact_path, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, "exhibits": exhibits_manifest_path, **visual_paths}
 
 
 def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:

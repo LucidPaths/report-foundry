@@ -126,10 +126,15 @@ uv run reportfoundry compile-spec .factory-run/spacex-ipo/evidence_pack.json \
 
 Outputs:
 
+- `*.evidence.json` — copied evidence input used by the renderer package.
 - `*.spec.json` — strict ReportSpec: sections, claim fact IDs, visual provenance, source appendix, and renderer/tool routes.
 - `*.json` — renderer-neutral Report IR compiled from the spec.
 - `*.html` — HTML/CSS preview artifact.
 - `*.pdf` — Playwright/Chromium print-to-PDF artifact from the generated HTML/CSS package.
+- `*.layout.json` and `*.pages/` — PDF layout metrics and page previews for QA.
+- `*.citations.json`, `*.citations.csl.json`, `*.citations.bib`, and `*.source_appendix.md` — citation/source appendix sidecars.
+- `exhibits.json` plus `exhibits/*.vega.json` when formal Vega-Lite exhibits are present.
+- `render_gate_result.json` and `*.render_artifact.json` — renderer route result and package artifact manifest.
 
 This is the first practical version of the foundry toolkit model: LLM/research fills a strict plain-text+structured spec, the foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance. The PDF route uses Chromium as the layout engine; the LLM does not hand-edit PDF geometry.
 
