@@ -93,6 +93,7 @@ class ReportSpec(BaseModel):
     source_appendix: SourceAppendix
     source_fact_map: dict[str, list[str]]
     fact_details: dict[str, SpecFact]
+    generation_metadata: dict[str, str] = Field(default_factory=dict)
 
 
 def _professional_report_sections(pack: EvidencePack) -> list[SpecSection]:
@@ -244,6 +245,10 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
         source_appendix=SourceAppendix(headers=["Source", "Title", "URL", "Observed", "SHA-256", "Extractor"], rows=source_rows),
         source_fact_map={source.source_id: [fact.fact_id for fact in pack.facts if fact.source_id == source.source_id] for source in pack.sources},
         fact_details={fact.fact_id: SpecFact(**fact.model_dump()) for fact in pack.facts},
+        generation_metadata={
+            "run_mode": str(pack.scope.get("run_mode", "fixture")),
+            "artifact_status": str(pack.scope.get("artifact_status", pack.scope.get("run_mode", "fixture"))),
+        },
     )
 
 

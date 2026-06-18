@@ -311,7 +311,8 @@ CLI behavior:
 
 ```bash
 reportfoundry plan-run "topic" --run-mode product ...
-reportfoundry research-run RUN_DIR --source-dir SOURCES --run-mode fixture
+reportfoundry research-run RUN_DIR --source-dir SOURCES
+reportfoundry research-run RUN_DIR --source-dir SOURCES --allow-fixture-sources  # explicit product-mode override
 ```
 
 Default should remain `fixture` until a real connector exists. Product mode should require a connector, not local marked files unless explicitly allowed.
@@ -350,7 +351,7 @@ manifest.json -> run_mode
 research_run_log.json -> run_mode
 EvidencePack.scope -> run_mode
 ReportSpec.generation_metadata -> run_mode
-QA result -> run_mode and product_blockers
+QA result -> mode-sensitive gate severities; product blockers are represented as error checks
 ```
 
 ### Tests first
@@ -368,6 +369,25 @@ Write failing tests for:
 - One test proves the same `EvidencePack` gets different severity under fixture vs product mode.
 - Product mode cannot silently ship weak source evidence.
 - CLI output clearly says when a run is fixture-only.
+
+### Fulfilled in this pass
+
+Verified by `uv run --extra dev pytest -q` -> `52 passed in 14.03s`.
+
+Implemented:
+
+- `RunMode` is centralized in `src/report_foundry/factory.py` and reused by connector contracts.
+- `ReportRunManifest.run_mode` defaults to `fixture` and is persisted by `plan-run`.
+- `ResearchRunLog.run_mode`, `EvidencePack.scope["run_mode"]`, `EvidencePack.scope["artifact_status"]`, and `ReportSpec.generation_metadata` now disclose mode.
+- `plan-run --run-mode product` writes product mode and prints `mode=product`.
+- `research-run` rejects product manifests that point at local marked fixture sources unless `--allow-fixture-sources` is explicit.
+- Product mode promotes source-tier deficits from warning to error; fixture mode keeps the same deficit as warning.
+- Product override still fails closed when local fixtures cannot satisfy product source-tier quotas.
+
+Remaining from the broader gate-policy list:
+
+- Dedicated top-level QA-result `run_mode` / `product_blockers` fields are not yet added; current behavior represents product blockers as mode-sensitive error checks.
+- Missing citation metadata, visual fact-ID, and raw prose-as-source policies are partly covered by existing evidence/connector gates but not all are product-mode-specific yet.
 
 ---
 

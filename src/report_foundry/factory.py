@@ -5,13 +5,19 @@ Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P4 Gates Fail Closed; RF-P5
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .evidence import EvidencePack, validate_evidence_pack
+
+
+class RunMode(StrEnum):
+    FIXTURE = "fixture"
+    PRODUCT = "product"
+    EXPERIMENT = "experiment"
 
 
 class Department(str, Enum):
@@ -105,6 +111,7 @@ class ReportRunManifest(BaseModel):
     rubric: ReportRubric
     integration_mode: Literal["cli", "mcp", "server", "library"] = "cli"
     connected_sources: list[str] = Field(default_factory=list)
+    run_mode: RunMode = RunMode.FIXTURE
 
 
 class SourcePlanItem(BaseModel):
@@ -360,6 +367,7 @@ def write_run_package(
     out_dir: Path,
     integration_mode: Literal["cli", "mcp", "server", "library"] = "cli",
     connected_sources: list[str] | None = None,
+    run_mode: RunMode = RunMode.FIXTURE,
 ) -> RunPackage:
     rubric = build_case_rubric(topic, audience=audience)
     manifest = ReportRunManifest(
@@ -367,11 +375,12 @@ def write_run_package(
         rubric=rubric,
         integration_mode=integration_mode,
         connected_sources=connected_sources or [],
+        run_mode=run_mode,
     )
     source_plan = build_source_plan(rubric)
     visual_plan = build_visual_plan(rubric)
     worker_plan = build_autonomy_plan(topic=topic, source_plan=source_plan, visual_plan=visual_plan)
-    empty_evidence = EvidencePack(title=topic, scope={"status": "planning_only_no_sources_observed_yet"})
+    empty_evidence = EvidencePack(title=topic, scope={"status": "planning_only_no_sources_observed_yet", "run_mode": run_mode.value, "artifact_status": _artifact_status(run_mode)})
     initial_gate_result = evaluate_factory_gates(
         manifest,
         empty_evidence,
@@ -391,7 +400,7 @@ def write_run_package(
 def evaluate_factory_gates(manifest: ReportRunManifest, evidence: EvidencePack, *, pages: list[PageMetrics]) -> FactoryGateResult:
     checks: list[FactoryGateCheck] = []
     checks.extend(_evidence_contract_checks(evidence))
-    checks.extend(_research_coverage_checks(manifest.rubric, evidence))
+    checks.extend(_research_coverage_checks(manifest.rubric, evidence, run_mode=manifest.run_mode))
     checks.extend(_synthesis_checks(manifest.rubric, evidence))
     checks.extend(_layout_checks(manifest.rubric, pages))
 
@@ -408,7 +417,7 @@ def _evidence_contract_checks(evidence: EvidencePack) -> list[FactoryGateCheck]:
     ]
 
 
-def _research_coverage_checks(rubric: ReportRubric, evidence: EvidencePack) -> list[FactoryGateCheck]:
+def _research_coverage_checks(rubric: ReportRubric, evidence: EvidencePack, *, run_mode: RunMode = RunMode.FIXTURE) -> list[FactoryGateCheck]:
     predicates = {fact.predicate for fact in evidence.facts}
     checks: list[FactoryGateCheck] = []
     for tier, required_count in rubric.required_source_tiers.items():
@@ -421,7 +430,7 @@ def _research_coverage_checks(rubric: ReportRubric, evidence: EvidencePack) -> l
                     code="insufficient_source_tier",
                     message=f"Research source tier quota not met: {tier} requires {required_count}, observed {observed_count}.",
                     department=Department.RESEARCH,
-                    severity="warning",
+                    severity=_source_tier_severity(run_mode),
                 )
             )
     for dimension in rubric.required_dimensions:
@@ -525,6 +534,20 @@ def _visual_purpose(visual_id: str) -> str:
     }
     return purposes.get(visual_id, f"Explain {visual_id.replace('_', ' ')} visually with sourced evidence.")
 
+
+
+def _artifact_status(run_mode: RunMode) -> str:
+    if run_mode == RunMode.PRODUCT:
+        return "product"
+    if run_mode == RunMode.EXPERIMENT:
+        return "experiment"
+    return "fixture"
+
+
+def _source_tier_severity(run_mode: RunMode) -> Severity:
+    if run_mode == RunMode.PRODUCT:
+        return "error"
+    return "warning"
 
 def _write_json(path: Path, model: BaseModel) -> None:
     path.write_text(model.model_dump_json(indent=2), encoding="utf-8")

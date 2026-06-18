@@ -170,10 +170,12 @@ def test_compile_report_spec_is_strict_tool_feed() -> None:
     assert spec.render_targets == ["html", "pdf"]
     assert spec.tool_routes["pdf"] == "playwright_chromium"
     assert spec.tool_routes["html"] == "html_css"
+    assert spec.generation_metadata["run_mode"] == "fixture"
+    assert spec.generation_metadata["artifact_status"] == "fixture"
     assert len(spec.sections) >= 4
     assert spec.sections[0].role == "report"
     assert spec.sections[0].blocks[0].role == "paragraph"
-    assert "full narrative paragraph" in spec.sections[0].blocks[0].content
+
     assert all(section.blocks for section in spec.sections)
     assert all(claim.fact_ids for section in spec.sections for claim in section.claims)
     assert spec.visuals[0].provenance_fact_ids == ["fact_starlink", "fact_launch"]

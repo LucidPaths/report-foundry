@@ -12,7 +12,7 @@ import typer
 from rich import print
 
 from .draft import parse_markdown_draft_file
-from .factory import write_run_package
+from .factory import RunMode, write_run_package
 from .ir import Report
 from .evidence import EvidencePack
 from .qa import run_quality_gates
@@ -31,6 +31,7 @@ def plan_run(
     out_dir: Path = Path(".factory-run"),
     integration_mode: str = "cli",
     source: list[str] = typer.Option(default_factory=list, help="Connected source namespace, MCP tool, database, or web connector."),
+    run_mode: RunMode = typer.Option(RunMode.FIXTURE, help="Artifact governance mode: fixture, product, or experiment."),
 ) -> None:
     """Create a factory run package from a topic before research starts."""
     if integration_mode not in {"cli", "mcp", "server", "library"}:
@@ -42,16 +43,27 @@ def plan_run(
         out_dir=out_dir,
         integration_mode=integration_mode,  # type: ignore[arg-type]
         connected_sources=source,
+        run_mode=run_mode,
     )
     print(f"[green]factory run package[/green] {package.run_dir}")
+    print(f"mode={package.manifest.run_mode.value}")
     print(f"route_back={package.initial_gate_result.route_back_department or 'none'} score={package.initial_gate_result.score}")
 
 
 @app.command("research-run")
-def research_run(run_dir: Path, source_dir: Path = typer.Option(..., help="Directory containing .md/.txt marked source files.")) -> None:
+def research_run(
+    run_dir: Path,
+    source_dir: Path = typer.Option(..., help="Directory containing .md/.txt marked source files."),
+    allow_fixture_sources: bool = typer.Option(False, help="Allow local marked sources even when manifest.run_mode is product."),
+) -> None:
     """Fixture adapter: extract evidence from local marked sources."""
-    result = write_research_artifacts(run_dir=run_dir, source_dir=source_dir)
+    try:
+        result = write_research_artifacts(run_dir=run_dir, source_dir=source_dir, allow_fixture_sources=allow_fixture_sources)
+    except ValueError as exc:
+        print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
     print(f"[green]research evidence[/green] {run_dir / 'evidence_pack.json'}")
+    print(f"mode={result.manifest.run_mode.value}")
     print(f"route_back={result.gate_result.route_back_department or 'none'} score={result.gate_result.score}")
     if not result.gate_result.ok:
         raise typer.Exit(1)

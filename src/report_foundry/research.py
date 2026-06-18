@@ -16,7 +16,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from .evidence import EvidenceClaim, EvidenceFact, EvidencePack, SourceObservation
-from .factory import FactoryGateResult, PageMetrics, ReportRunManifest, SourcePlan, evaluate_factory_gates
+from .factory import FactoryGateResult, PageMetrics, ReportRunManifest, RunMode, SourcePlan, evaluate_factory_gates
 
 
 class ResearchSourceCandidate(BaseModel):
@@ -45,6 +45,7 @@ class ResearchRunLog(BaseModel):
     run_dir: str
     source_dir: str
     source_plan_dimensions: list[str]
+    run_mode: RunMode = RunMode.FIXTURE
     candidates: list[ResearchSourceCandidate] = Field(default_factory=list)
     extraction_steps: list[ResearchExtractionStep] = Field(default_factory=list)
     evidence_gaps: list[ResearchEvidenceGap] = Field(default_factory=list)
@@ -58,8 +59,10 @@ class ResearchResult(BaseModel):
     run_log: ResearchRunLog
 
 
-def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResult:
+def build_research_evidence(*, run_dir: Path, source_dir: Path, allow_fixture_sources: bool = False) -> ResearchResult:
     manifest = ReportRunManifest.model_validate_json((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.run_mode == RunMode.PRODUCT and not allow_fixture_sources:
+        raise ValueError("product mode requires a connector; local fixture sources require --allow-fixture-sources")
     source_plan = SourcePlan.model_validate_json((run_dir / "source_plan.json").read_text(encoding="utf-8"))
     source_documents = _read_source_documents(source_dir)
 
@@ -119,6 +122,9 @@ def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResul
         subtitle="Local marked-source research evidence",
         scope={
             "research_mode": "local_marked_sources",
+            "run_mode": manifest.run_mode.value,
+            "artifact_status": _artifact_status(manifest.run_mode),
+            "fixture_source_override": bool(allow_fixture_sources),
             "source_dir": str(source_dir),
             "required_dimensions": [item.dimension for item in source_plan.items],
         },
@@ -139,6 +145,7 @@ def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResul
         run_dir=str(run_dir),
         source_dir=str(source_dir),
         source_plan_dimensions=[item.dimension for item in source_plan.items],
+        run_mode=manifest.run_mode,
         candidates=candidates,
         extraction_steps=extraction_steps,
         evidence_gaps=evidence_gaps,
@@ -151,13 +158,21 @@ def build_research_evidence(*, run_dir: Path, source_dir: Path) -> ResearchResul
     return ResearchResult(manifest=manifest, source_plan=source_plan, evidence=evidence, gate_result=gate_result, run_log=run_log)
 
 
-def write_research_artifacts(*, run_dir: Path, source_dir: Path) -> ResearchResult:
-    result = build_research_evidence(run_dir=run_dir, source_dir=source_dir)
+def write_research_artifacts(*, run_dir: Path, source_dir: Path, allow_fixture_sources: bool = False) -> ResearchResult:
+    result = build_research_evidence(run_dir=run_dir, source_dir=source_dir, allow_fixture_sources=allow_fixture_sources)
     (run_dir / "evidence_pack.json").write_text(result.evidence.model_dump_json(indent=2), encoding="utf-8")
     (run_dir / "research_gate_result.json").write_text(result.gate_result.model_dump_json(indent=2), encoding="utf-8")
     (run_dir / "research_run_log.json").write_text(result.run_log.model_dump_json(indent=2), encoding="utf-8")
     return result
 
+
+
+def _artifact_status(run_mode: RunMode) -> str:
+    if run_mode == RunMode.PRODUCT:
+        return "product"
+    if run_mode == RunMode.EXPERIMENT:
+        return "experiment"
+    return "fixture"
 
 class _SourceDocument(BaseModel):
     path: Path

@@ -10,6 +10,7 @@ from report_foundry.factory import (
     Department,
     PageMetrics,
     ReportRunManifest,
+    RunMode,
     build_case_rubric,
     build_source_plan,
     build_visual_plan,
@@ -175,6 +176,27 @@ def test_source_tier_quota_is_visible_gate_signal_before_real_connectors() -> No
     assert all(check.severity == "warning" for check in tier_checks)
 
 
+def test_product_mode_promotes_source_tier_quota_to_error_for_same_evidence_pack() -> None:
+    rubric = build_case_rubric("current SpaceX IPO launch newsletter", audience="executive readers")
+    dimensions = [dimension.name for dimension in rubric.required_dimensions]
+    pack = pack_with_dimensions(dimensions)
+
+    fixture_result = evaluate_factory_gates(
+        ReportRunManifest(topic="current SpaceX IPO launch newsletter", rubric=rubric, run_mode=RunMode.FIXTURE),
+        pack,
+        pages=[PageMetrics(page_number=1, fill_ratio=0.75, has_source_appendix=True)],
+    )
+    product_result = evaluate_factory_gates(
+        ReportRunManifest(topic="current SpaceX IPO launch newsletter", rubric=rubric, run_mode=RunMode.PRODUCT),
+        pack,
+        pages=[PageMetrics(page_number=1, fill_ratio=0.75, has_source_appendix=True)],
+    )
+
+    assert any(check.code == "insufficient_source_tier" and check.severity == "warning" for check in fixture_result.checks)
+    assert any(check.code == "insufficient_source_tier" and check.severity == "error" for check in product_result.checks)
+    assert product_result.route_back_department == Department.RESEARCH
+
+
 def test_write_run_package_persists_manifest_plans_and_initial_gate_result(tmp_path) -> None:
     out_dir = tmp_path / "factory-run"
 
@@ -184,6 +206,7 @@ def test_write_run_package_persists_manifest_plans_and_initial_gate_result(tmp_p
         out_dir=out_dir,
         integration_mode="mcp",
         connected_sources=["company-db", "web"],
+        run_mode=RunMode.PRODUCT,
     )
 
     assert package.run_dir == out_dir
@@ -198,6 +221,7 @@ def test_write_run_package_persists_manifest_plans_and_initial_gate_result(tmp_p
     gate_text = (out_dir / "initial_gate_result.json").read_text(encoding="utf-8")
 
     assert "company-db" in manifest_text
+    assert '"run_mode": "product"' in manifest_text
     assert "starlink_economics" in source_plan_text
     assert "missing_required_dimension" in gate_text
     assert package.initial_gate_result.route_back_department == Department.RESEARCH
