@@ -201,7 +201,7 @@ def test_compile_spec_to_report_preserves_claim_citations_and_visual_claim() -> 
 def test_write_spec_artifacts_creates_report_spec_ir_html_and_pdf(tmp_path: Path) -> None:
     paths = write_spec_artifacts(make_evidence_pack(), tmp_path)
 
-    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews", "citations", "csl", "bibtex", "source_appendix", "exhibits"}
+    assert set(paths) == {"spec", "ir", "html", "pdf", "evidence_trace_map", "layout_metrics", "page_previews", "citations", "csl", "bibtex", "source_appendix", "exhibits", "render_gate_result"}
     for key, path in paths.items():
         assert path.exists(), (key, path)
         if path.is_file():

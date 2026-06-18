@@ -16,11 +16,13 @@ from pydantic import BaseModel, Field, field_validator
 
 from .citations import citation_export_from_evidence, render_source_appendix_markdown, source_appendix_rows
 from .evidence import EvidencePack, validate_evidence_pack
+from .factory import RunMode
 from .exhibit_adapters import write_exhibit_artifacts, write_exhibit_manifest
 from .exhibits import ExhibitSpec, exhibit_specs_from_evidence, validate_exhibit_specs
 from .ir import Citation, Claim, Figure, Report, Section, TableBlock, TextBlock
 from .qa import run_quality_gates
-from .render import render_html, render_html_pdf_with_chromium
+from .render import render_html
+from .renderers import RenderRequest, render_with_route
 
 RenderTarget = Literal["html", "pdf"]
 ToolRoute = Literal["html_css", "playwright_chromium", "reportlab", "vega_lite", "mermaid", "typst"]
@@ -328,7 +330,7 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
     return Report(title=spec.title, subtitle=spec.subtitle, sections=sections, tags=["report-spec", *spec.render_targets])
 
 
-def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None = None) -> dict[str, Path]:
+def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None = None, route: str = "playwright_chromium") -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     spec = compile_report_spec(pack)
     artifact_stem = _stem(stem or pack.title)
@@ -359,12 +361,24 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
-    render_html_pdf_with_chromium(html_path, pdf_path)
-    layout_metrics = analyze_pdf_layout(pdf_path)
-    _assert_pdf_layout_quality(layout_metrics)
-    layout_metrics_path.write_text(json.dumps(layout_metrics, indent=2), encoding="utf-8")
-    page_previews_dir = _write_pdf_page_previews(pdf_path, out_dir / f"{artifact_stem}.pages")
-    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, "exhibits": exhibits_manifest_path, **visual_paths}
+    render_artifact = render_with_route(
+        RenderRequest(
+            report_spec_path=spec_path,
+            evidence_pack_path=out_dir / f"{artifact_stem}.evidence.json",
+            citation_records_path=citations_path,
+            exhibit_specs_path=exhibits_manifest_path,
+            html_path=html_path,
+            pdf_path=pdf_path,
+            metrics_path=layout_metrics_path,
+            previews_dir=out_dir / f"{artifact_stem}.pages",
+            route=route,
+            out_dir=out_dir,
+            run_mode=RunMode(str(pack.scope.get("run_mode", "fixture"))),
+        )
+    )
+    page_previews_dir = Path(render_artifact.preview_paths[0]).parent if render_artifact.preview_paths else out_dir / f"{artifact_stem}.pages"
+    render_gate_result_path = Path(render_artifact.gate_result_path or (out_dir / "render_gate_result.json"))
+    return {"spec": spec_path, "ir": ir_path, "html": html_path, "pdf": pdf_path, "layout_metrics": layout_metrics_path, "page_previews": page_previews_dir, "render_gate_result": render_gate_result_path, "citations": citations_path, "csl": csl_path, "bibtex": bibtex_path, "source_appendix": source_appendix_path, "exhibits": exhibits_manifest_path, **visual_paths}
 
 
 def analyze_pdf_layout(pdf_path: Path) -> dict[str, object]:

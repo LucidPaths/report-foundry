@@ -823,6 +823,26 @@ reportfoundry compile-spec evidence_pack.json --route pandoc --out-dir out
 - If a route is unavailable, the gate records a real failure reason.
 - Report Foundry never changes evidence law to satisfy a renderer.
 
+### Fulfilled in this pass
+
+Verified by `uv run --extra dev pytest -q` -> `66 passed in 20.55s`.
+
+Implemented:
+
+- Added `src/report_foundry/renderers.py` with `RenderRequest`, `RenderArtifact`, `RendererAdapter`, `PlaywrightChromiumRendererAdapter`, `TypstRendererAdapter`, `PandocRendererAdapter`, `RendererRouteError`, and `render_with_route`.
+- Added `tests/test_renderer_adapters.py` covering immutable evidence input, unknown renderer route fail-closed behavior, unavailable Typst gate behavior, and explicit CLI route selection for `playwright_chromium`.
+- `write_spec_artifacts` now routes PDF/layout/preview work through `render_with_route(...)` instead of directly calling Chromium from `report_spec.py`.
+- `compile-spec` now accepts `--route playwright_chromium|typst|pandoc` and reports the selected route.
+- The Playwright route remains the baseline and still emits HTML, PDF, page previews, layout metrics, and now `render_gate_result.json`.
+- Unknown routes and unavailable Typst/Pandoc routes write `render_gate_result.json` with a concrete failure code instead of silently succeeding.
+- Renderer tests prove the evidence pack file is unchanged by rendering.
+
+Remaining / not claimed:
+
+- Typst and Pandoc are scaffolded routes only; they do not render documents yet.
+- `write_spec_artifacts` still constructs the renderer-neutral package in-process before calling the renderer adapter; a later package-level CLI can split this into separate run-package stages.
+- Renderer-independent gates are currently basic route/gate artifacts plus existing PDF layout checks; citation visibility, required-section visibility, and extracted-PDF text gates can be strengthened in the next QA/package pass.
+
 ---
 
 # Cross-cutting worker/execution handoff

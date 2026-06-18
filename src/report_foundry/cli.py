@@ -90,11 +90,12 @@ def compile_draft(
 
 
 @app.command("compile-spec")
-def compile_spec(input: Path, out_dir: Path = Path(".output_spec")) -> None:
+def compile_spec(input: Path, out_dir: Path = Path(".output_spec"), route: str = typer.Option("playwright_chromium", help="Renderer route: playwright_chromium, typst, or pandoc.")) -> None:
     """Compile an EvidencePack into strict ReportSpec, IR, HTML, and PDF artifacts."""
     pack = EvidencePack.model_validate_json(input.read_text(encoding="utf-8"))
-    paths = write_spec_artifacts(pack, out_dir, stem=input.stem)
+    paths = write_spec_artifacts(pack, out_dir, stem=input.stem, route=route)
     print(f"[green]report spec[/green] {paths['spec']}")
+    print(f"[green]route[/green]={route}")
     print(f"[green]built[/green] {paths['html']}")
     print(f"[green]built[/green] {paths['pdf']}")
 
