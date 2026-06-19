@@ -68,6 +68,26 @@ def test_render_html_forces_semantic_sections_onto_new_pdf_pages():
     assert "page-break-before:always" in html
 
 
+def test_render_html_forces_side_by_side_sections_to_start_on_new_pdf_pages():
+    html = render_html(
+        Report(
+            title="Side segment report",
+            sections=[
+                Section(title="Executive summary", blocks=[TextBlock(text="Full-width summary")]),
+                Section(title="QUIC", blocks=[TextBlock(text="Full-width setup")]),
+                Section(title="HTTP/3: HTTP Semantics over QUIC", blocks=[TextBlock(text="Dense side segment")]),
+                Section(title="WebTransport and WebSockets", blocks=[TextBlock(text="Another dense side segment")]),
+            ],
+        )
+    )
+
+    assert "section class='section side-segment side-segment-start'><h2>HTTP/3: HTTP Semantics over QUIC</h2>" in html
+    assert "section class='section side-segment'><h2>WebTransport and WebSockets</h2>" in html
+    assert ".side-segment-start{break-before:page" in html
+    assert ".side-segment{display:grid" in html
+    assert ".side-segment .section-body{columns:2" in html
+
+
 def test_render_pdf_writes_real_pdf(tmp_path: Path):
     out = tmp_path / "report.pdf"
 

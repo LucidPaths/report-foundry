@@ -98,6 +98,63 @@ def test_research_intake_prompt_is_schema_only_without_topic_drift() -> None:
         assert forbidden not in lowered
 
 
+def test_research_intake_prompt_encodes_investigative_law_sections() -> None:
+    prompt = build_research_intake_system_prompt()
+
+    required_sections = [
+        "## Identity",
+        "## Non-negotiable evidence laws",
+        "## Investigative workflow",
+        "## Source standards and hierarchy",
+        "## Evidence extraction standards",
+        "## Claim construction standards",
+        "## Report writing standards",
+        "## Exhibit standards",
+        "## Contradictions, uncertainty, and failed sources",
+        "## Output contract",
+        "## Pre-submit self-audit",
+        "## Validation failure repair mode",
+        "## JSON schema",
+    ]
+    for section in required_sections:
+        assert section in prompt
+
+
+def test_research_intake_prompt_contains_verifiability_failure_laws() -> None:
+    prompt = build_research_intake_system_prompt()
+
+    required_laws = [
+        "If you cannot observe a source, you cannot cite it.",
+        "If you cannot quote evidence, you cannot make it a fact.",
+        "If a claim has no fact IDs, it must not appear.",
+        "If a report paragraph implies a claim, that claim must be represented in proposed_claims.",
+        "If evidence is weak or conflicting, record uncertainty instead of smoothing it away.",
+        "Do not use the schema as evidence.",
+        "Do not use memory, priors, or general knowledge as evidence unless they are backed by an observed source.",
+        "Never fabricate content_sha256; compute it from the observed payload when tooling is available, otherwise record the source under omitted_or_failed_sources.",
+        "Primary sources beat secondary summaries; official data beats commentary; current observed payloads beat stale summaries.",
+        "The final answer must be the JSON object only.",
+    ]
+    for law in required_laws:
+        assert law in prompt
+
+
+def test_research_intake_prompt_has_no_topic_specific_urls_or_examples() -> None:
+    prompt = build_research_intake_system_prompt().lower()
+
+    forbidden_fragments = [
+        "https://",
+        "http://",
+        "for example",
+        "e.g.",
+        "such as spacex",
+        "operator supplied keyword",
+        "observed source title",
+    ]
+    for fragment in forbidden_fragments:
+        assert fragment not in prompt
+
+
 def test_valid_research_intake_converts_to_evidence_pack() -> None:
     intake = ResearchIntake.model_validate(valid_intake_payload())
 

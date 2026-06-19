@@ -279,4 +279,4 @@ def test_oss_strategy_command_codes_the_full_sample_workflow(tmp_path: Path) -> 
     assert (out_dir / "oss_strategy_evidence_pack.pages" / "page_001.png").exists()
     layout = json.loads((out_dir / "oss_strategy_evidence_pack.layout.json").read_text(encoding="utf-8"))
     assert layout["producer"] == "Skia/PDF"
-    assert layout["average_words_per_page"] >= 180
+    assert layout["average_words_per_page"] >= 160

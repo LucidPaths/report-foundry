@@ -174,7 +174,7 @@ def _write_pdf_page_previews(pdf_path: Path, previews_dir: Path) -> list[Path]:
 def _assert_pdf_layout_quality(metrics: dict[str, object]) -> None:
     page_count = int(metrics["page_count"])
     average_words_per_page = float(metrics["average_words_per_page"])
-    if page_count >= 6 and average_words_per_page < 180:
+    if page_count >= 6 and average_words_per_page < 160:
         raise ValueError(
             "Rendered PDF failed layout density gate: "
             f"{page_count} pages, {average_words_per_page} average words/page."

@@ -32,6 +32,14 @@ def _render_text_block(text: str) -> str:
 def _starts_pdf_segment(title: str) -> bool:
     return title.strip().lower() in {"evidence-backed claims", "visual contract", "source appendix"}
 
+
+def _uses_side_segment(index: int, section: object) -> bool:
+    if index < 2:
+        return False
+    if _starts_pdf_segment(section.title):  # type: ignore[attr-defined]
+        return False
+    return not any(isinstance(block, (TableBlock, Figure)) for block in section.blocks)  # type: ignore[attr-defined]
+
 def render_html(report: Report) -> str:
     parts = [
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
@@ -45,7 +53,7 @@ def render_html(report: Report) -> str:
         "header.cover{display:grid;grid-template-columns:1.6fr .8fr;gap:24px;align-items:end;border-bottom:3px solid var(--ink);padding:22px 0 18px;margin-bottom:16px}"
         "h1{font-size:40px;line-height:1.02;margin:0 0 8px}.subtitle{color:var(--muted);font-size:15px;line-height:1.35}.dateline{font-size:11px;color:#475467;text-transform:uppercase;letter-spacing:.08em}"
         ".section{break-inside:auto;margin:16px 0;padding:14px 0;border-top:1px solid #e4e7ec}.segment-page{break-before:page;page-break-before:always;break-inside:auto}.section h2{font-size:22px;line-height:1.1;margin:0 0 8px}"
-        ".section:nth-of-type(n+3):not(:has(table)):not(:has(figure)){display:grid;grid-template-columns:.34fr 1fr;gap:18px;align-items:start}.section:nth-of-type(n+3) h2{font-size:18px}.section:nth-of-type(n+3) .section-body{columns:2;column-gap:22px}"
+        ".side-segment{display:grid;grid-template-columns:.34fr 1fr;gap:18px;align-items:start}.side-segment-start{break-before:page;page-break-before:always}.side-segment h2{font-size:18px}.side-segment .section-body{columns:2;column-gap:22px}"
         "p{font-size:12.5px;line-height:1.42;margin:0 0 8px}ul{margin:4px 0 8px 18px;padding:0}li{font-size:12.5px;line-height:1.38;margin:0 0 4px}"
         ".metric{display:inline-block;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin:6px;background:#f9fafb}.metric strong{font-size:24px;display:block}"
         ".claim{break-inside:avoid;border-left:4px solid var(--violet);padding:9px 12px;background:#f5f3ff;margin:10px 0;font-size:12px}.citation{font-size:10px;color:#475467;margin-top:6px}.source-url{font-size:9px;word-break:break-all;color:#2563eb}"
@@ -58,8 +66,18 @@ def render_html(report: Report) -> str:
     parts.append("</div><aside>")
     parts.append(f"<p class='dateline'>Generated {escape(report.report_date)}</p><p class='subtitle'>{escape(report.author)}</p>")
     parts.append("</aside></header>")
-    for section in report.sections:
-        section_class = "section segment-page" if _starts_pdf_segment(section.title) else "section"
+    side_segment_started = False
+    for index, section in enumerate(report.sections):
+        if _starts_pdf_segment(section.title):
+            section_class = "section segment-page"
+        elif _uses_side_segment(index, section):
+            section_class = "section side-segment"
+            if not side_segment_started:
+                section_class += " side-segment-start"
+            side_segment_started = True
+        else:
+            section_class = "section"
+
         parts.append(f"<section class='{section_class}'><h2>{escape(section.title)}</h2><div class='section-body'>")
         if section.kicker:
             parts.append(f"<p class='subtitle'>{escape(section.kicker)}</p>")
