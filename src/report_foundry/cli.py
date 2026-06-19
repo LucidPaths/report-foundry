@@ -43,7 +43,16 @@ def wizard(
         entered_constraint = typer.prompt("Research constraint", default="Use concrete observed sources; do not invent evidence")
         constraint = [entered_constraint] if entered_constraint.strip() else []
 
-    request = ResearchRequest(keyword=topic, audience=audience, constraints=constraint)
+    request = ResearchRequest(
+        user_request=topic,
+        topic=topic,
+        core_question=topic,
+        audience=audience,
+        intended_use="professional evidence-backed report",
+        depth="deep_research_report",
+        format_preferences=["pdf"],
+        explicit_constraints=constraint,
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     request_path = out_dir / "research_request.json"
     prompt_path = out_dir / "research_gate_prompt.md"
@@ -76,8 +85,8 @@ To pass through this door:
 - research the operator request using concrete observed sources;
 - Do not invent sources, quotes, URLs, facts, claims, or citations;
 - write the full report inside the ResearchIntake JSON schema;
-- every claim must reference extracted fact IDs;
-- every extracted fact must reference an observed source and quote;
+- every claim must reference supporting fact IDs;
+- every fact must reference an observed source and quote/excerpt;
 - return only valid JSON matching the schema below.
 
 {build_research_intake_system_prompt()}

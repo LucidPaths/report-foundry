@@ -35,18 +35,24 @@ def test_wizard_prompts_for_topic_and_writes_research_gate_package(tmp_path: Pat
 
     request = json.loads(request_path.read_text(encoding="utf-8"))
     assert request == {
-        "keyword": "QUIC protocol portfolio",
+        "user_request": "QUIC protocol portfolio",
+        "topic": "QUIC protocol portfolio",
+        "core_question": "QUIC protocol portfolio",
         "audience": "CTO readers",
-        "task": "deep_research_report",
-        "constraints": ["Use primary standards sources only"],
+        "intended_use": "professional evidence-backed report",
+        "geographic_scope": None,
+        "time_scope": None,
+        "depth": "deep_research_report",
+        "format_preferences": ["pdf"],
+        "explicit_constraints": ["Use primary standards sources only"],
     }
 
     prompt = prompt_path.read_text(encoding="utf-8")
     assert "You are entering Report Foundry" in prompt
-    assert "Return only valid JSON" in prompt
-    assert "ResearchIntake" in prompt
+    assert "Return exactly one valid JSON object" in prompt
+    assert "Report Foundry Research Intake System Prompt" in prompt
     assert "QUIC protocol portfolio" in prompt
-    assert "Do not invent sources" in prompt
+    assert "fabricate sources" in prompt
 
     intake_stub = intake_path.read_text(encoding="utf-8")
     assert "PASTE_RESEARCH_INTAKE_JSON_HERE" in intake_stub
@@ -70,6 +76,7 @@ def test_wizard_accepts_topic_options_without_interactive_prompt(tmp_path: Path)
 
     assert result.exit_code == 0, result.output
     request = json.loads((tmp_path / "run" / "research_request.json").read_text(encoding="utf-8"))
-    assert request["keyword"] == "AI datacenter power constraints"
+    assert request["topic"] == "AI datacenter power constraints"
+    assert request["user_request"] == "AI datacenter power constraints"
     assert request["audience"] == "infrastructure investors"
-    assert request["constraints"] == ["Prefer regulator and grid-operator sources"]
+    assert request["explicit_constraints"] == ["Prefer regulator and grid-operator sources"]

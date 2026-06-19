@@ -36,7 +36,7 @@ class SourceObservation(BaseModel):
     title: str
     url: str | None = None
     observed_at: str
-    content_sha256: str
+    content_sha256: str | None = None
     extractor: str
     locator: str | None = None
     source_tier: SourceTier = "unclassified"
@@ -46,7 +46,9 @@ class SourceObservation(BaseModel):
 
     @field_validator("content_sha256")
     @classmethod
-    def sha256_must_look_real(cls, value: str) -> str:
+    def sha256_must_look_real(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
         if len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value.lower()):
             raise ValueError("content_sha256 must be a 64-character hex sha256 digest")
         return value.lower()
