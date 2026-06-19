@@ -5,6 +5,7 @@ Lattice: RF-P4 Gates Fail Closed; RF-P8 Low Floor, High Ceiling.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import typer
@@ -17,13 +18,70 @@ from .ir import Report
 from .evidence import EvidencePack
 from .qa import run_quality_gates
 from .research import write_research_artifacts
-from .research_intake import IntakeValidationError, ResearchIntake, build_research_intake_system_prompt, research_intake_to_evidence_pack
+from .research_intake import IntakeValidationError, ResearchIntake, ResearchRequest, build_research_intake_system_prompt, research_intake_to_evidence_pack
 from .render import render_html, render_pdf
 from .renderers import RendererRouteError
 from .report_spec import write_spec_artifacts
 from .samples import write_oss_strategy_report
 
 app = typer.Typer(help="AI-native evidence-to-PDF report compiler.")
+
+
+@app.command("wizard")
+def wizard(
+    topic: str | None = typer.Option(None, "--topic", "-t", help="Research topic/request. Prompted when omitted."),
+    audience: str | None = typer.Option(None, "--audience", "-a", help="Target reader. Prompted when omitted."),
+    constraint: list[str] = typer.Option(default_factory=list, show_default=False, help="Research/source/output constraint. Repeatable."),
+    out_dir: Path = typer.Option(Path(".foundry_wizard"), help="Directory for the research gate package."),
+) -> None:
+    """Open the research gate: collect a topic and write the LLM intake package."""
+    if topic is None:
+        topic = typer.prompt("Research topic")
+    if audience is None:
+        audience = typer.prompt("Audience", default="executive readers")
+    if not constraint:
+        entered_constraint = typer.prompt("Research constraint", default="Use concrete observed sources; do not invent evidence")
+        constraint = [entered_constraint] if entered_constraint.strip() else []
+
+    request = ResearchRequest(keyword=topic, audience=audience, constraints=constraint)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    request_path = out_dir / "research_request.json"
+    prompt_path = out_dir / "research_gate_prompt.md"
+    intake_path = out_dir / "research_intake.json"
+
+    request_json = json.dumps(request.model_dump(), indent=2)
+    request_path.write_text(request_json + "\n", encoding="utf-8")
+    prompt_path.write_text(_research_gate_prompt(request_json), encoding="utf-8")
+    intake_path.write_text("PASTE_RESEARCH_INTAKE_JSON_HERE\n", encoding="utf-8")
+
+    print(f"[green]research gate[/green] {out_dir}")
+    print(f"[green]request[/green] {request_path}")
+    print(f"[green]llm prompt[/green] {prompt_path}")
+    print(f"[green]intake target[/green] {intake_path}")
+    print("next: give research_gate_prompt.md to the research LLM, save JSON to research_intake.json, then run:")
+    print(f"uv run reportfoundry compile-intake {intake_path} --out-dir {out_dir / 'compiled'}")
+
+
+def _research_gate_prompt(request_json: str) -> str:
+    return f"""# Report Foundry research gate
+
+You are entering Report Foundry. This CLI door is a research gate, not a casual chat prompt.
+
+Operator request:
+```json
+{request_json}
+```
+
+To pass through this door:
+- research the operator request using concrete observed sources;
+- Do not invent sources, quotes, URLs, facts, claims, or citations;
+- write the full report inside the ResearchIntake JSON schema;
+- every claim must reference extracted fact IDs;
+- every extracted fact must reference an observed source and quote;
+- return only valid JSON matching the schema below.
+
+{build_research_intake_system_prompt()}
+"""
 
 
 @app.command("plan-run")
