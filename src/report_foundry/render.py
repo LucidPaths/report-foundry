@@ -56,8 +56,9 @@ def render_html(report: Report) -> str:
         ".side-segment{display:grid;grid-template-columns:.34fr 1fr;gap:18px;align-items:start}.side-segment-start{break-before:page;page-break-before:always}.side-segment h2{font-size:18px}.side-segment .section-body{columns:2;column-gap:22px}"
         "p{font-size:12.5px;line-height:1.42;margin:0 0 8px}ul{margin:4px 0 8px 18px;padding:0}li{font-size:12.5px;line-height:1.38;margin:0 0 4px}"
         ".metric{display:inline-block;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin:6px;background:#f9fafb}.metric strong{font-size:24px;display:block}"
-        ".claim{break-inside:avoid;border-left:4px solid var(--violet);padding:9px 12px;background:#f5f3ff;margin:10px 0;font-size:12px}.citation{font-size:10px;color:#475467;margin-top:6px}.source-url{font-size:9px;word-break:break-all;color:#2563eb}"
-        ".figure{break-inside:avoid;border:1px solid #98a2b3;border-radius:16px;padding:12px;margin:12px 0;background:linear-gradient(180deg,#ffffff,#f8fafc);color:#475467}.figure img{max-width:100%;border-radius:10px;border:1px solid var(--line)}"
+        ".claim{break-inside:avoid;page-break-inside:avoid;border-left:4px solid var(--violet);padding:9px 12px;background:#f5f3ff;margin:10px 0;font-size:12px}.citation{font-size:10px;color:#475467;margin-top:6px}.source-url{font-size:9px;word-break:break-all;color:#2563eb}"
+        ".figure{break-inside:avoid;page-break-inside:avoid;border:1px solid #98a2b3;border-radius:16px;padding:12px;margin:12px 0;background:linear-gradient(180deg,#ffffff,#f8fafc);color:#475467}.figure img{display:block;max-width:100%;max-height:220mm;object-fit:contain;border-radius:10px;border:1px solid var(--line)}"
+        "@media print{body{background:#fff}.rf-underlay{display:none}main{background:#fff;min-height:auto}.segment-page{padding-top:10mm}.segment-page .figure{max-height:240mm;overflow:hidden}}"
         "table{border-collapse:collapse;width:100%;margin:10px 0;font-size:9px}td,th{border:1px solid var(--line);padding:5px;text-align:left;vertical-align:top}th{background:#eef2ff}</style></head><body><div class='rf-underlay'></div><main><header class='cover'><div>",
         f"<h1>{escape(report.title)}</h1>",
     ]

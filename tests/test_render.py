@@ -43,6 +43,10 @@ def test_render_html_uses_professional_density_and_design_primitives():
 
     assert "rf-underlay" in html
     assert "linear-gradient" in html or "radial-gradient" in html
+    assert "@media print" in html
+    assert ".rf-underlay{display:none}" in html
+    assert "page-break-inside:avoid" in html
+    assert "max-height:220mm" in html
     assert "display:grid" in html
     assert "break-inside:avoid" in html
 
