@@ -56,6 +56,7 @@ class ExhibitArtifact(BaseModel):
     route: str
     vega_json_path: str | None = None
     image_path: str | None = None
+    svg_path: str | None = None
     alt_text: str
     source_fact_ids: list[str]
 

@@ -42,6 +42,19 @@ class StrictIntakeModel(BaseModel):
 _ID_RE = re.compile(r"^[a-z0-9_-]+$")
 
 
+def _required_text(value: str, field_name: str) -> str:
+    if not value.strip():
+        raise ValueError(f"{field_name} is required")
+    return value
+
+
+def _minimum_text(value: str, field_name: str, minimum: int = 24) -> str:
+    _required_text(value, field_name)
+    if len(value.strip()) < minimum:
+        raise ValueError(f"{field_name} must be substantive enough for reader-facing report output")
+    return value
+
+
 def _safe_id(value: str) -> str:
     if not _ID_RE.fullmatch(value):
         raise ValueError("IDs may only contain lowercase letters, numbers, underscores, and hyphens")
@@ -236,6 +249,11 @@ class ReportThesis(StrictIntakeModel):
     referenced_fact_ids: list[str]
     confidence: Literal["high", "medium", "low"] = "low"
 
+    @field_validator("text")
+    @classmethod
+    def text_substantive(cls, value: str) -> str:
+        return _minimum_text(value, "thesis.text")
+
     @field_validator("referenced_claim_ids", "referenced_fact_ids")
     @classmethod
     def ids_safe(cls, value: list[str]) -> list[str]:
@@ -246,6 +264,11 @@ class ExecutiveSummary(StrictIntakeModel):
     text: str
     referenced_claim_ids: list[str]
     referenced_fact_ids: list[str]
+
+    @field_validator("text")
+    @classmethod
+    def text_substantive(cls, value: str) -> str:
+        return _minimum_text(value, "executive_summary.text")
 
     @field_validator("referenced_claim_ids", "referenced_fact_ids")
     @classmethod
@@ -260,6 +283,11 @@ class KeyTakeaway(StrictIntakeModel):
     confidence: Literal["high", "medium", "low"] = "low"
     referenced_claim_ids: list[str]
     referenced_fact_ids: list[str]
+
+    @field_validator("takeaway", "evidence_basis", "implication")
+    @classmethod
+    def takeaway_fields_substantive(cls, value: str) -> str:
+        return _minimum_text(value, "key_takeaways field")
 
     @field_validator("referenced_claim_ids", "referenced_fact_ids")
     @classmethod
@@ -291,15 +319,23 @@ class IntakeReportSection(StrictIntakeModel):
     @field_validator("body")
     @classmethod
     def body_required(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("report sections must contain body prose")
-        return value
+        return _minimum_text(value, "body")
+
+    @field_validator("lede", "so_what", "limits")
+    @classmethod
+    def section_fields_required(cls, value: str) -> str:
+        return _minimum_text(value, "so_what/limits/lede")
 
 
 class ReportConclusion(StrictIntakeModel):
     text: str
     referenced_claim_ids: list[str]
     referenced_fact_ids: list[str]
+
+    @field_validator("text")
+    @classmethod
+    def text_substantive(cls, value: str) -> str:
+        return _minimum_text(value, "conclusion.text")
 
     @field_validator("referenced_claim_ids", "referenced_fact_ids")
     @classmethod
@@ -312,6 +348,11 @@ class WhatToWatchItem(StrictIntakeModel):
     why_it_matters: str
     related_claim_ids: list[str] = Field(default_factory=list)
     related_fact_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("item", "why_it_matters")
+    @classmethod
+    def watch_fields_substantive(cls, value: str) -> str:
+        return _minimum_text(value, "what_to_watch")
 
     @field_validator("related_claim_ids", "related_fact_ids")
     @classmethod
@@ -327,7 +368,7 @@ class IntakeReport(StrictIntakeModel):
     key_takeaways: list[KeyTakeaway]
     sections: list[IntakeReportSection]
     conclusion: ReportConclusion
-    what_to_watch: list[WhatToWatchItem] = Field(default_factory=list)
+    what_to_watch: list[WhatToWatchItem]
 
     @field_validator("title")
     @classmethod
@@ -336,11 +377,11 @@ class IntakeReport(StrictIntakeModel):
             raise ValueError("report title is required")
         return value
 
-    @field_validator("key_takeaways", "sections")
+    @field_validator("key_takeaways", "sections", "what_to_watch")
     @classmethod
     def required_lists(cls, value: list[object]) -> list[object]:
         if not value:
-            raise ValueError("full report requires key_takeaways and sections")
+            raise ValueError("full report requires key_takeaways, sections, and what_to_watch")
         return value
 
 
@@ -380,6 +421,11 @@ class IntakeMethodology(StrictIntakeModel):
     evidence_extraction: str
     confidence_method: str
     known_limitations: list[str] = Field(default_factory=list)
+
+    @field_validator("summary", "source_selection", "evidence_extraction", "confidence_method")
+    @classmethod
+    def methodology_fields_substantive(cls, value: str) -> str:
+        return _minimum_text(value, "methodology")
 
 
 class ValidationNotes(StrictIntakeModel):
@@ -496,7 +542,7 @@ def research_intake_to_evidence_pack(intake: ResearchIntake, *, author: str = "R
         ],
         sections=professional_sections,
         what_to_watch=[f"{item.item} — {item.why_it_matters}" for item in intake.report.what_to_watch],
-        methodology=intake.methodology.summary,
+        methodology=_methodology_text(intake),
     )
 
     return EvidencePack(
@@ -528,6 +574,19 @@ def research_intake_to_evidence_pack(intake: ResearchIntake, *, author: str = "R
         tags=["research-intake", intake.schema_version],
     )
 
+
+
+def _methodology_text(intake: ResearchIntake) -> str:
+    limitations = "; ".join(intake.methodology.known_limitations) or "No additional methodology limitations declared."
+    return "\n".join(
+        [
+            f"Summary: {intake.methodology.summary}",
+            f"Source selection: {intake.methodology.source_selection}",
+            f"Evidence extraction: {intake.methodology.evidence_extraction}",
+            f"Confidence method: {intake.methodology.confidence_method}",
+            f"Known limitations: {limitations}",
+        ]
+    )
 
 def _source_to_observation(source: IntakeSource) -> SourceObservation:
     tier = {"high": "primary", "medium": "trusted_secondary", "low": "secondary", "unknown": "unclassified"}[source.reliability]

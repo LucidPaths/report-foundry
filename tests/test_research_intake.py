@@ -12,7 +12,9 @@ import pytest
 from typer.testing import CliRunner
 
 from report_foundry.cli import app
+from report_foundry.citations import citation_export_from_evidence
 from report_foundry.evidence import validate_evidence_pack
+from report_foundry.report_spec import compile_report_spec, compile_spec_to_report, write_spec_artifacts
 from report_foundry.research_intake import (
     IntakeValidationError,
     ResearchIntake,
@@ -135,7 +137,14 @@ def valid_intake_payload() -> dict[str, object]:
                 "referenced_claim_ids": ["claim_a"],
                 "referenced_fact_ids": ["fact_a"],
             },
-            "what_to_watch": [],
+            "what_to_watch": [
+                {
+                    "item": "Whether additional observed sources confirm or narrow the finding.",
+                    "why_it_matters": "Additional source observation would test whether the bounded claim generalizes.",
+                    "related_claim_ids": ["claim_a"],
+                    "related_fact_ids": ["fact_a"],
+                }
+            ],
         },
         "exhibits": [],
         "methodology": {
@@ -415,3 +424,163 @@ def test_research_intake_rejects_reserved_generated_visual_id() -> None:
 
     with pytest.raises(IntakeValidationError, match="reserved_visual_id"):
         research_intake_to_evidence_pack(ResearchIntake.model_validate(payload))
+
+def test_compile_spec_accepts_null_source_hash_without_citation_contradiction() -> None:
+    payload = valid_intake_payload()
+    payload["sources"][0]["content_hash"] = None  # type: ignore[index]
+
+    pack = research_intake_to_evidence_pack(ResearchIntake.model_validate(payload))
+    export = citation_export_from_evidence(pack)
+    spec = compile_report_spec(pack)
+
+    assert export.records[0].content_sha256 is None
+    assert spec.source_appendix.rows[0][1] == "Observed source title"
+
+
+def test_research_audit_fields_render_into_reader_ir() -> None:
+    payload = valid_intake_payload()
+    payload["assumptions"] = [
+        {
+            "assumption": "assumption_a is explicit and bounded.",
+            "reason": "Only one source payload was observed.",
+            "risk_if_wrong": "The report could overstate the finding.",
+        }
+    ]
+    payload["failed_sources"] = [
+        {
+            "id": "failed_a",
+            "locator_or_description": "Unavailable primary source",
+            "reason_failed": "The source could not be observed in this run.",
+            "impact_on_report": "The report remains bounded to the observed secondary source.",
+        }
+    ]
+    payload["excluded_sources"] = [
+        {
+            "id": "excluded_a",
+            "locator_or_description": "Unverifiable source snippet",
+            "reason_excluded": "No observable quote or payload was available.",
+        }
+    ]
+    payload["contradictions"] = [
+        {
+            "id": "contradiction_a",
+            "description": "No contradiction was resolved beyond the observed source boundary.",
+            "fact_ids": ["fact_a"],
+            "claim_ids": ["claim_a"],
+            "possible_explanations": ["Only one source was available."],
+            "recommended_report_treatment": "State the limitation instead of smoothing it away.",
+        }
+    ]
+    payload["uncertainties"] = [
+        {
+            "id": "uncertainty_a",
+            "description": "The finding may change with another observed source.",
+            "affected_claim_ids": ["claim_a"],
+            "affected_fact_ids": ["fact_a"],
+            "severity": "medium",
+            "recommended_language": "Based on the observed source only.",
+        }
+    ]
+    payload["research_gaps"] = [
+        {
+            "id": "gap_a",
+            "gap": "A primary source confirmation is still missing.",
+            "why_it_matters": "It would raise confidence in the claim.",
+            "suggested_source_type": "Primary source document",
+            "priority": "high",
+        }
+    ]
+    payload["validation_notes"] = {
+        "self_audit_passed": False,
+        "issues_found": ["validation_issue_a"],
+        "repair_actions_taken": ["repair_action_a"],
+        "validator_risks": ["validator_risk_a"],
+    }
+
+    pack = research_intake_to_evidence_pack(ResearchIntake.model_validate(payload))
+    report = compile_spec_to_report(compile_report_spec(pack))
+    rendered_text = report.model_dump_json()
+
+    for expected in [
+        "Research audit",
+        "Assumptions",
+        "assumption_a is explicit and bounded",
+        "Failed sources",
+        "failed_a",
+        "Excluded sources",
+        "excluded_a",
+        "Contradictions",
+        "contradiction_a",
+        "Uncertainties",
+        "uncertainty_a",
+        "Research gaps",
+        "gap_a",
+        "Validation notes",
+        "validation_issue_a",
+        "repair_action_a",
+        "validator_risk_a",
+    ]:
+        assert expected in rendered_text
+
+
+def test_research_intake_rejects_missing_semantic_completeness_fields() -> None:
+    payload = valid_intake_payload()
+    payload["report"]["what_to_watch"] = []  # type: ignore[index]
+    with pytest.raises(ValueError, match="what_to_watch"):
+        ResearchIntake.model_validate(payload)
+
+    payload = valid_intake_payload()
+    del payload["report"]["what_to_watch"]  # type: ignore[index]
+    with pytest.raises(ValueError, match="what_to_watch"):
+        ResearchIntake.model_validate(payload)
+
+    payload = valid_intake_payload()
+    payload["methodology"]["source_selection"] = "   "  # type: ignore[index]
+    with pytest.raises(ValueError, match="methodology"):
+        ResearchIntake.model_validate(payload)
+
+    payload = valid_intake_payload()
+    payload["report"]["sections"][0]["body"] = "too short"  # type: ignore[index]
+    with pytest.raises(ValueError, match="body"):
+        ResearchIntake.model_validate(payload)
+
+    payload = valid_intake_payload()
+    payload["report"]["sections"][0]["so_what"] = "   "  # type: ignore[index]
+    with pytest.raises(ValueError, match="so_what"):
+        ResearchIntake.model_validate(payload)
+
+    payload = valid_intake_payload()
+    payload["report"]["sections"][0]["limits"] = "   "  # type: ignore[index]
+    with pytest.raises(ValueError, match="limits"):
+        ResearchIntake.model_validate(payload)
+
+
+def test_write_spec_artifacts_manifest_records_generated_mermaid_visuals(tmp_path: Path) -> None:
+    payload = valid_intake_payload()
+    payload["exhibits"] = [
+        {
+            "id": "source_to_claim_map",
+            "title": "Source to claim map",
+            "exhibit_type": "evidence_map",
+            "purpose": "Show the observed source to fact to claim path.",
+            "referenced_fact_ids": ["fact_a"],
+            "referenced_claim_ids": ["claim_a"],
+            "data_requirements": ["source_a", "fact_a", "claim_a"],
+            "visual_encoding": "source to fact to claim",
+            "limitations": ["Only one observed source is represented."],
+            "renderer_notes": "Render as a Mermaid evidence map.",
+        }
+    ]
+    payload["report"]["sections"][0]["suggested_exhibit_ids"] = ["source_to_claim_map"]  # type: ignore[index]
+
+    pack = research_intake_to_evidence_pack(ResearchIntake.model_validate(payload))
+    paths = write_spec_artifacts(pack, tmp_path, stem="manifest_probe")
+    manifest = json.loads(paths["exhibits"].read_text(encoding="utf-8"))
+    artifact_ids = {artifact["exhibit_id"] for artifact in manifest["artifacts"]}
+
+    assert "source_to_claim_map" in artifact_ids
+    assert "evidence_trace_map" in artifact_ids
+    for artifact in manifest["artifacts"]:
+        if artifact["exhibit_id"] in {"source_to_claim_map", "evidence_trace_map"}:
+            assert artifact["route"] == "mermaid"
+            assert artifact["svg_path"].endswith(".svg")

@@ -27,14 +27,24 @@ class CitationRecord(BaseModel):
     accessed: str
     locator: str | None = None
     source_tier: SourceTier = "unclassified"
-    content_sha256: str
+    content_sha256: str | None = None
 
-    @field_validator("citation_id", "source_id", "title", "accessed", "content_sha256")
+    @field_validator("citation_id", "source_id", "title", "accessed")
     @classmethod
     def required_text(cls, value: str) -> str:
         if not value.strip():
             raise ValueError("citation required text fields must not be empty")
         return value
+
+    @field_validator("content_sha256")
+    @classmethod
+    def hash_valid_or_null(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        lowered = value.lower()
+        if len(lowered) != 64 or any(ch not in "0123456789abcdef" for ch in lowered):
+            raise ValueError("citation content_sha256 must be a 64-character hex sha256 digest or null")
+        return lowered
 
 
 class CitationExport(BaseModel):

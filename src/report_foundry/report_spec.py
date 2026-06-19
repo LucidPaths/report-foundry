@@ -18,7 +18,7 @@ from .citations import citation_export_from_evidence, render_source_appendix_mar
 from .evidence import EvidencePack, validate_evidence_pack
 from .factory import RunMode
 from .exhibit_adapters import write_exhibit_artifacts, write_exhibit_manifest
-from .exhibits import ExhibitSpec, exhibit_specs_from_evidence, validate_exhibit_specs
+from .exhibits import ExhibitArtifact, ExhibitSpec, exhibit_specs_from_evidence, validate_exhibit_specs
 from .ir import Citation, Claim, Figure, Report, Section, TextBlock
 from .package import build_package_manifest, write_package_manifest
 from .qa import run_quality_gates
@@ -280,7 +280,7 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
                 )
             )
         elif section.section_id == "scope":
-            continue
+            sections.append(_scope_audit_section(section))
         elif section.section_id == "evidence_claims":
             sections.append(
                 Section(
@@ -331,12 +331,45 @@ def compile_spec_to_report(spec: ReportSpec, visual_paths: dict[str, Path] | Non
     return Report(title=spec.title, subtitle=spec.subtitle, sections=sections, tags=["report-spec", *spec.render_targets])
 
 
+def _scope_audit_section(section: SpecSection) -> Section:
+    raw_scope = "\n".join(block.content for block in section.blocks)
+    audit_blocks = [TextBlock(text="Research audit fields preserved from ResearchIntake scope.")]
+    wanted = [
+        ("assumptions", "Assumptions"),
+        ("failed_sources", "Failed sources"),
+        ("excluded_sources", "Excluded sources"),
+        ("contradictions", "Contradictions"),
+        ("uncertainties", "Uncertainties"),
+        ("research_gaps", "Research gaps"),
+        ("validation_notes", "Validation notes"),
+    ]
+    for key, heading in wanted:
+        line = _scope_line(raw_scope, key)
+        if line and line not in {"[]", "{}", "None"}:
+            audit_blocks.append(TextBlock(text=f"{heading}: {line}"))
+    if len(audit_blocks) == 1:
+        audit_blocks.append(TextBlock(text="No assumptions, failed/excluded sources, contradictions, uncertainties, research gaps, or validation issues were declared."))
+    return Section(
+        title="Research audit",
+        kicker="Uncertainty, gaps, source failures, and validator notes are reader-visible instead of hidden in JSON.",
+        blocks=audit_blocks,
+    )
+
+
+def _scope_line(raw_scope: str, key: str) -> str | None:
+    prefix = f"{key}: "
+    for line in raw_scope.splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix):]
+    return None
+
 def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None = None, route: str = "playwright_chromium") -> dict[str, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     spec = compile_report_spec(pack)
     artifact_stem = _stem(stem or pack.title)
     visual_paths = _write_visual_artifacts(spec, out_dir, artifact_stem)
     exhibit_artifacts = write_exhibit_artifacts(spec.exhibits, pack, out_dir / "exhibits")
+    visual_artifacts = _visual_artifacts_from_paths(spec, visual_paths)
     visual_paths.update({artifact.exhibit_id: Path(artifact.vega_json_path) for artifact in exhibit_artifacts if artifact.vega_json_path})
     report = compile_spec_to_report(spec, visual_paths)
     qa = run_quality_gates(report)
@@ -362,7 +395,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     csl_path.write_text(json.dumps(citation_export.csl_json, indent=2), encoding="utf-8")
     bibtex_path.write_text(citation_export.bibtex or "", encoding="utf-8")
     source_appendix_path.write_text(render_source_appendix_markdown(citation_export.records), encoding="utf-8")
-    write_exhibit_manifest(exhibit_artifacts, exhibits_manifest_path)
+    write_exhibit_manifest([*exhibit_artifacts, *visual_artifacts], exhibits_manifest_path)
     spec_path.write_text(spec.model_dump_json(indent=2), encoding="utf-8")
     ir_path.write_text(report.model_dump_json(indent=2), encoding="utf-8")
     html_path.write_text(render_html(report), encoding="utf-8")
@@ -434,6 +467,26 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     )
     return {**paths, "package_manifest": package_manifest_path}
 
+
+
+def _visual_artifacts_from_paths(spec: ReportSpec, visual_paths: dict[str, Path]) -> list[ExhibitArtifact]:
+    visuals_by_id = {visual.visual_id: visual for visual in spec.visuals}
+    artifacts: list[ExhibitArtifact] = []
+    for visual_id, path in visual_paths.items():
+        visual = visuals_by_id.get(visual_id)
+        if visual is None:
+            continue
+        artifacts.append(
+            ExhibitArtifact(
+                exhibit_id=visual.visual_id,
+                route=visual.preferred_tool,
+                svg_path=str(path) if path.suffix.lower() == ".svg" else None,
+                image_path=str(path) if path.suffix.lower() not in {".svg", ".json"} else None,
+                alt_text=visual.alt_text or visual.plain_text_payload,
+                source_fact_ids=visual.provenance_fact_ids,
+            )
+        )
+    return artifacts
 
 def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:
     paths: dict[str, Path] = {}
