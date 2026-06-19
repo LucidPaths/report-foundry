@@ -29,6 +29,21 @@ RenderTarget = Literal["html", "pdf"]
 ToolRoute = Literal["html_css", "playwright_chromium", "reportlab", "vega_lite", "mermaid", "typst"]
 
 
+def _spec_visual_tool_route(route: str) -> ToolRoute:
+    """Map exhibit renderer routes onto ReportSpec visual tool routes.
+
+    Exhibit rendering has data/asset routes (for example ``table`` and
+    ``image``) that are valid in the exhibit layer but intentionally absent
+    from the reader-facing ReportSpec tool route enum. Preserve specialized
+    routes that ReportSpec understands; send generic exhibit routes through
+    HTML/CSS so Pydantic validation fails closed without rejecting valid
+    non-chart exhibits.
+    """
+    if route in {"vega_lite", "mermaid", "typst"}:
+        return route
+    return "html_css"
+
+
 class SpecClaim(BaseModel):
     claim_id: str
     text: str
@@ -239,7 +254,7 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
                     visual_id=exhibit.exhibit_id,
                     visual_type=exhibit.kind.value if exhibit.kind.value in {"evidence_map", "chart", "matrix", "timeline", "diagram"} else "chart",
                     purpose=exhibit.insight,
-                    preferred_tool=exhibit.renderer_route,
+                    preferred_tool=_spec_visual_tool_route(exhibit.renderer_route),
                     provenance_fact_ids=exhibit.fact_ids,
                     plain_text_payload=exhibit.plain_text_payload or exhibit.alt_text,
                     alt_text=exhibit.alt_text,
@@ -370,7 +385,7 @@ def write_spec_artifacts(pack: EvidencePack, out_dir: Path, *, stem: str | None 
     visual_paths = _write_visual_artifacts(spec, out_dir, artifact_stem)
     exhibit_artifacts = write_exhibit_artifacts(spec.exhibits, pack, out_dir / "exhibits")
     visual_artifacts = _visual_artifacts_from_paths(spec, visual_paths)
-    visual_paths.update({artifact.exhibit_id: Path(artifact.vega_json_path) for artifact in exhibit_artifacts if artifact.vega_json_path})
+    visual_paths.update(_exhibit_artifact_paths(exhibit_artifacts))
     report = compile_spec_to_report(spec, visual_paths)
     qa = run_quality_gates(report)
     if not qa.ok:
@@ -480,13 +495,24 @@ def _visual_artifacts_from_paths(spec: ReportSpec, visual_paths: dict[str, Path]
             ExhibitArtifact(
                 exhibit_id=visual.visual_id,
                 route=visual.preferred_tool,
+                html_path=str(path) if path.suffix.lower() == ".html" else None,
                 svg_path=str(path) if path.suffix.lower() == ".svg" else None,
-                image_path=str(path) if path.suffix.lower() not in {".svg", ".json"} else None,
+                image_path=str(path) if path.suffix.lower() not in {".html", ".svg", ".json"} else None,
                 alt_text=visual.alt_text or visual.plain_text_payload,
                 source_fact_ids=visual.provenance_fact_ids,
             )
         )
     return artifacts
+
+
+def _exhibit_artifact_paths(artifacts: list[ExhibitArtifact]) -> dict[str, Path]:
+    paths: dict[str, Path] = {}
+    for artifact in artifacts:
+        raw_path = artifact.vega_json_path or artifact.html_path or artifact.svg_path or artifact.image_path
+        if raw_path:
+            paths[artifact.exhibit_id] = Path(raw_path)
+    return paths
+
 
 def _write_visual_artifacts(spec: ReportSpec, out_dir: Path, artifact_stem: str) -> dict[str, Path]:
     paths: dict[str, Path] = {}

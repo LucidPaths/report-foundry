@@ -5,6 +5,7 @@ Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P4 Gates Fail Closed; RF-P6
 
 from __future__ import annotations
 
+import html
 import json
 from pathlib import Path
 from typing import Protocol
@@ -42,13 +43,46 @@ class VegaLiteExhibitAdapter:
         )
 
 
+class HtmlExhibitAdapter:
+    route = "table"
+
+    def render(self, spec: ExhibitSpec, evidence: EvidencePack, out_dir: Path) -> ExhibitArtifact:
+        if spec.renderer_route != self.route:
+            raise ValueError(f"HtmlExhibitAdapter cannot render route {spec.renderer_route}")
+        result = validate_exhibit_specs([spec], evidence, product_mode=str(evidence.scope.get("run_mode", "fixture")) == "product")
+        if not result.ok:
+            codes = ", ".join(check.code for check in result.checks if check.severity == "error")
+            raise ValueError(f"Invalid exhibit spec: {codes}")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{spec.exhibit_id}.html"
+        rows = "\n".join(
+            f"<tr><td>{html.escape(point.label)}</td><td>{html.escape(str(point.value))}</td><td>{html.escape(point.fact_id)}</td></tr>"
+            for point in spec.data
+        )
+        payload = html.escape(spec.plain_text_payload or spec.alt_text)
+        body = (
+            f"<!doctype html><meta charset='utf-8'><title>{html.escape(spec.title)}</title>"
+            f"<figure><figcaption>{html.escape(spec.insight)}</figcaption>"
+            f"<table><thead><tr><th>Label</th><th>Value</th><th>Fact ID</th></tr></thead><tbody>{rows}</tbody></table>"
+            f"<pre>{payload}</pre></figure>"
+        )
+        path.write_text(body, encoding="utf-8")
+        return ExhibitArtifact(
+            exhibit_id=spec.exhibit_id,
+            route=self.route,
+            html_path=str(path),
+            alt_text=spec.alt_text,
+            source_fact_ids=spec.fact_ids,
+        )
+
+
 def write_exhibit_artifacts(specs: list[ExhibitSpec], evidence: EvidencePack, out_dir: Path) -> list[ExhibitArtifact]:
     result = validate_exhibit_specs(specs, evidence, product_mode=str(evidence.scope.get("run_mode", "fixture")) == "product")
     if not result.ok:
         codes = ", ".join(check.code for check in result.checks if check.severity == "error")
         raise ValueError(f"Invalid exhibit specs: {codes}")
     artifacts: list[ExhibitArtifact] = []
-    adapters: dict[str, ExhibitAdapter] = {"vega_lite": VegaLiteExhibitAdapter()}
+    adapters: dict[str, ExhibitAdapter] = {"vega_lite": VegaLiteExhibitAdapter(), "table": HtmlExhibitAdapter()}
     for spec in specs:
         adapter = adapters.get(spec.renderer_route)
         if adapter is None:

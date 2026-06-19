@@ -105,6 +105,32 @@ def test_exhibit_with_unknown_fact_id_fails_gate() -> None:
     assert any(check.code == "exhibit_data_unknown_fact_id" for check in result.checks)
 
 
+def test_non_chart_draft_exhibit_uses_valid_html_route_fallback() -> None:
+    pack = make_exhibit_pack()
+    pack.exhibits[0].visual_type = "table"
+    pack.exhibits[0].preferred_tool = "html_css"
+
+    exhibit_spec = exhibit_specs_from_evidence(pack)[0]
+    report_spec = compile_report_spec(pack)
+
+    assert exhibit_spec.renderer_route == "table"
+    assert report_spec.visuals[0].preferred_tool == "html_css"
+
+
+def test_table_exhibit_writes_renderable_html_artifact(tmp_path: Path) -> None:
+    pack = make_exhibit_pack()
+    pack.exhibits[0].visual_type = "table"
+    pack.exhibits[0].preferred_tool = "html_css"
+
+    paths = write_spec_artifacts(pack, tmp_path)
+    manifest = json.loads(paths["exhibits"].read_text(encoding="utf-8"))
+    table_artifact = next(artifact for artifact in manifest["artifacts"] if artifact["exhibit_id"] == "segment_metrics")
+
+    assert table_artifact["route"] == "table"
+    assert table_artifact["html_path"].endswith("segment_metrics.html")
+    assert Path(table_artifact["html_path"]).exists()
+
+
 def test_vega_lite_adapter_emits_json_with_data_values_tied_to_facts(tmp_path: Path) -> None:
     pack = make_exhibit_pack()
     spec = exhibit_specs_from_evidence(pack)[0]
