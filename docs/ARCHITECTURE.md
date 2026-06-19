@@ -1,19 +1,44 @@
 # Report Foundry Architecture
 
-Report Foundry is an AI-operated report factory. Users connect their own AI/search provider keys, enter a keyword/topic, and the foundry turns AI search output into a governed report package. Deterministic code owns source law, evidence validation, gate routing, rendering, verification, and publishing. Models and connected agents may search, research, draft, code, and critique, but every output moves through typed handoffs and quality gates.
+Report Foundry is an evidence-contract and artifact factory. A research-capable LLM/session searches, reads, and reasons over the topic, then returns structured `ResearchIntake` JSON. Foundry validates that contract and turns it into governed HTML/PDF/package artifacts. Deterministic code owns schema law, evidence validation, gate routing, rendering, verification, logs, and publishing. The LLM owns research behavior.
 
 ## Product loop
 
 ```text
-user-connected AI/search key -> keyword/topic -> AI search -> source observations -> foundry evidence graph -> report package
+keyword/topic -> LLM research session -> ResearchIntake JSON -> Foundry validation -> evidence graph -> report package
 ```
 
-The foundry is not the AI provider and not the search provider. Those are replaceable connectors. The foundry owns the invariant: every shipped claim/visual/layout decision must trace back to admissible source observations or fail closed.
+The foundry is not the AI provider, not the search provider, and not a crawler. Those are upstream capabilities. Foundry owns the invariant: every shipped claim/visual/layout decision must trace back to admissible source observations supplied in the contract or fail closed.
 
 ## Pipeline
 
 ```text
-keyword/topic -> case rubric -> source plan -> AI/search connector calls -> observed source payloads -> source hashes -> extracted facts -> supported claims -> visual plan -> semantic IR -> assets/charts -> HTML/PDF renderers -> QA score -> delivery
+keyword/topic -> research-capable LLM/session -> observed sources/facts/claims/report text -> ResearchIntake JSON -> Foundry validation -> semantic IR/ReportSpec -> assets/charts -> HTML/PDF renderers -> QA score -> delivery
+```
+
+## Responsibility law
+
+```text
+LLM/session responsibilities:
+  - use web/search/tools available in that session
+  - observe and quote sources
+  - choose relevant facts and claims
+  - write report prose inside ResearchIntake
+  - surface contradictions, uncertainty, and gaps
+
+Foundry responsibilities:
+  - provide prompt/schema law
+  - validate IDs, links, citations, and source/fact/claim contracts
+  - normalize valid intakes into EvidencePack/ReportSpec
+  - route renderer/tool adapters fail-closed
+  - produce HTML/PDF/package artifacts
+  - write run logs and QA evidence
+
+Not Foundry responsibilities:
+  - autonomous web browsing without an explicit connector runtime
+  - pretending a plain model endpoint has web_search tools
+  - deciding facts without supplied source observations
+  - hand-rolling PDF geometry with the LLM
 ```
 
 The factory layer is department-oriented:

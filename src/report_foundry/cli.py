@@ -33,7 +33,7 @@ from .json_repair import JsonRepairError, build_json_repair_prompt, normalize_re
 from .run_log import FoundryRunLog, utc_now
 from .samples import write_oss_strategy_report
 
-app = typer.Typer(help="AI-native evidence-to-PDF report compiler.")
+app = typer.Typer(help="Evidence-contract, QA, and PDF packaging layer for LLM-produced research.")
 
 
 @app.command("wizard")
@@ -43,7 +43,7 @@ def wizard(
     constraint: list[str] = typer.Option(default_factory=list, show_default=False, help="Research/source/output constraint. Repeatable."),
     out_dir: Path = typer.Option(Path(".foundry_wizard"), help="Directory for the research gate package."),
 ) -> None:
-    """Open the research gate: collect a topic and write the LLM intake package."""
+    """Write the prompt/schema package for a separate research-capable LLM session."""
     if topic is None:
         topic = typer.prompt("Research topic")
     if audience is None:
@@ -83,15 +83,17 @@ def wizard(
 def _research_gate_prompt(request_json: str) -> str:
     return f"""# Report Foundry research gate
 
-You are entering Report Foundry. This CLI door is a research gate, not a casual chat prompt.
+You are entering Report Foundry's research contract. Foundry does not browse,
+search, or decide facts here. Your research-capable LLM/session does that work;
+Foundry validates the returned structure and compiles the artifact package.
 
 Operator request:
 ```json
 {request_json}
 ```
 
-To pass through this door:
-- research the operator request using concrete observed sources;
+To pass through this contract:
+- use your available research/web tools to observe concrete sources;
 - Do not invent sources, quotes, URLs, facts, claims, or citations;
 - write the full report inside the ResearchIntake JSON schema;
 - every claim must reference supporting fact IDs;
@@ -217,7 +219,7 @@ def compile_intake(input: Path, out_dir: Path = Path(".output_intake"), route: s
 
 @app.command("glm-run")
 def glm_run(
-    topic: str = typer.Option(..., "--topic", "-t", help="Keyword/topic for the E2E GLM-style run."),
+    topic: str = typer.Option(..., "--topic", "-t", help="Keyword/topic for the intake contract."),
     out_dir: Path = typer.Option(Path(".foundry_runs/glm"), help="Run directory."),
     audience: str = typer.Option("executive readers", help="Target reader."),
     constraint: list[str] = typer.Option(default_factory=list, show_default=False, help="Research/source/output constraint. Repeatable."),
@@ -227,12 +229,12 @@ def glm_run(
     max_repair_attempts: int = typer.Option(1, help="JSON repair attempts after malformed model output."),
     route: str = typer.Option("playwright_chromium", help="Renderer route."),
 ) -> None:
-    """One-command keyword -> gate -> ResearchIntake -> PDF/package loop.
+    """One-command contract -> ResearchIntake -> PDF/package loop.
 
     The deterministic path accepts --intake-json for CI/local E2E testing. Live
-    execution calls the configured Ollama-compatible GLM endpoint, validates the
-    model JSON, retries through the repair prompt when needed, then compiles and
-    verifies the artifact package.
+    execution only asks the configured model to fill the ResearchIntake contract;
+    it does not provide web/search tools. Use a web-capable LLM session upstream
+    when the report needs fresh research, then pass the resulting JSON here.
     """
     run_log = FoundryRunLog(run_id=out_dir.name or "glm-run", topic=topic, model=model, started_at=utc_now())
     gate_dir = out_dir / "gate"

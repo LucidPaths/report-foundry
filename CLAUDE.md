@@ -1,6 +1,6 @@
 # Report Foundry Agent Instructions
 
-Report Foundry is an AI-operated report factory: user-connected AI/search turns a topic into a governed report package. The foundry is not the AI provider and not the search provider. Providers are adapters; source law, evidence gates, rendering, and QA are the product.
+Report Foundry is an evidence-contract and artifact factory: a research-capable LLM/session searches, reads, reasons, and returns structured `ResearchIntake`; Foundry validates that contract and renders the governed package. Foundry is not the AI provider, search provider, crawler, or autonomous browser. Schema law, evidence gates, rendering, run logs, and QA are the product.
 
 ## Principle Lattice
 
@@ -40,6 +40,7 @@ The test suite rejects missing, empty, duplicate, unknown, or misnamed declarati
 - A visual is a claim about numbers, relationships, geography, sequence, or risk.
 - A topic is not scope. The rubric/source plan/visual plan define scope before generation.
 - AI/search providers, renderers, MCP tools, and company data stores are replaceable adapters.
+- LLM/session owns research behavior; Foundry owns contract validation and artifact generation.
 - Run manifests reference key handles or environment variable names only; never raw secrets.
 - Partial artifacts are allowed internally only when gate results clearly route backward.
 
@@ -47,11 +48,12 @@ The test suite rejects missing, empty, duplicate, unknown, or misnamed declarati
 
 1. **Use `uv`, not ad-hoc pip.** Project commands should run through `uv run`.
 2. **Do not treat fixture research as product search.** `research-run` is local deterministic scaffolding only.
-3. **Do not let LLM output choose report law.** Models may propose; deterministic code gates admissibility.
-4. **Do not hand-roll layout engines prematurely.** Prefer typed IR plus established renderers/adapters.
-5. **Do not add provider-specific logic to core contracts.** Add connectors/adapters instead.
-6. **Do not store raw keys in schemas, manifests, fixtures, tests, or docs.** Store handles/env var names only.
-7. **When adding a new Python file, add canonical `Lattice:` notation immediately.**
+3. **Do not make Foundry pretend to browse.** Web/search belongs to the upstream LLM/tool session or an explicit connector runtime.
+4. **Do not let LLM output choose report law.** Models may propose; deterministic code gates admissibility.
+5. **Do not hand-roll layout engines prematurely.** Prefer typed IR plus established renderers/adapters.
+6. **Do not add provider-specific logic to core contracts.** Add connectors/adapters instead.
+7. **Do not store raw keys in schemas, manifests, fixtures, tests, or docs.** Store handles/env var names only.
+8. **When adding a new Python file, add canonical `Lattice:` notation immediately.**
 
 ## Common Tasks
 

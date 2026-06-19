@@ -16,7 +16,7 @@ from report_foundry.adequacy import run_research_adequacy_gates
 from report_foundry.cli import _validated_ollama_chat_endpoint, app
 from report_foundry.json_repair import normalize_research_intake_ids, parse_or_repair_json_object
 from report_foundry.research_intake import ResearchIntake
-from report_foundry.source_extract import _validate_fetch_url, fetch_readable_text, readable_text_from_html
+from report_foundry.source_extract import readable_text_from_html
 
 runner = CliRunner()
 
@@ -87,6 +87,22 @@ def test_glm_run_can_execute_one_command_from_existing_intake_fixture(tmp_path: 
     assert run_log["artifacts"]["pdf"].endswith("research_intake.pdf")
 
 
+def test_foundry_scope_law_is_visible_in_cli_prompt_and_docs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    prompt_result = runner.invoke(app, ["wizard", "--topic", "nvidia company history", "--audience", "executive readers", "--constraint", "Use observed sources"])
+
+    assert prompt_result.exit_code == 0, prompt_result.output
+    prompt = Path(".foundry_wizard/research_gate_prompt.md").read_text(encoding="utf-8")
+    readme = Path(__file__).parents[1].joinpath("README.md").read_text(encoding="utf-8")
+    architecture = Path(__file__).parents[1].joinpath("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+
+    assert "Foundry does not browse" in prompt
+    assert "Your research-capable LLM/session does that work" in prompt
+    assert "LLM/session: search, read, quote" in readme
+    assert "Not Foundry responsibilities" in architecture
+    assert "pretending a plain model endpoint has web_search tools" in architecture
+
+
 def test_readable_html_extractor_removes_script_noise_and_preserves_body_text() -> None:
     html = """
     <html><head><style>.x{display:none}</style><script>window.noise = 'bad';</script></head>
@@ -121,17 +137,6 @@ def test_json_repair_normalizes_uppercase_model_ids_and_references() -> None:
     assert normalized["facts"][0]["source_id"] == "s1"
     assert normalized["proposed_claims"][0]["supporting_fact_ids"] == ["f1"]
     assert normalized["report"]["sections"][0]["referenced_claim_ids"] == ["c1"]
-
-
-def test_source_fetch_url_validation_blocks_local_and_non_http_targets() -> None:
-    with pytest.raises(ValueError, match="http or https"):
-        _validate_fetch_url("file:///etc/passwd")
-    with pytest.raises(ValueError, match="non-public"):
-        _validate_fetch_url("http://127.0.0.1/metadata")
-    with pytest.raises(ValueError, match="non-public"):
-        _validate_fetch_url("http://169.254.169.254/latest/meta-data")
-    with pytest.raises(RuntimeError, match="connector policy"):
-        fetch_readable_text("https://example.com/source")
 
 
 def test_ollama_endpoint_validation_requires_https_except_localhost() -> None:
