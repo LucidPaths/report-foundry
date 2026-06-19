@@ -526,14 +526,28 @@ def _citations_for_claim(spec: ReportSpec, claim: SpecClaim) -> list[Citation]:
 
 
 def _evidence_map_payload(pack: EvidencePack) -> str:
-    lines = ["source -> fact -> claim"]
+    lines = ["source -> evidence -> claim"]
+    sources_by_id = {source.source_id: source for source in pack.sources}
     claims_by_fact = {fact_id: [] for fact_id in [fact.fact_id for fact in pack.facts]}
-    for index, claim in enumerate(pack.claims, 1):
+    for claim in pack.claims:
         for fact_id in claim.fact_ids:
-            claims_by_fact.setdefault(fact_id, []).append(f"claim_{index:03d}")
+            claims_by_fact.setdefault(fact_id, []).append(_evidence_map_label(claim.text))
     for fact in pack.facts:
-        lines.append(f"{fact.source_id} -> {fact.fact_id} -> {', '.join(claims_by_fact.get(fact.fact_id, [])) or 'no_claim'}")
+        source = sources_by_id.get(fact.source_id)
+        source_label = _source_evidence_map_label(source) if source else _evidence_map_label(fact.source_id)
+        evidence_label = _evidence_map_label(fact.quote or fact.value)
+        claim_labels = claims_by_fact.get(fact.fact_id, []) or ["No linked claim"]
+        lines.append(f"{source_label} -> {evidence_label} -> {', '.join(claim_labels)}")
     return "\n".join(lines)
+
+
+def _source_evidence_map_label(source: SourceObservation) -> str:
+    target = source.url or source.locator or source.source_id
+    return _evidence_map_label(f"{source.title} — {target}")
+
+
+def _evidence_map_label(value: object) -> str:
+    return str(value).replace("->", "→").replace("\n", " ").strip()
 
 
 def _stringify(value: object) -> str:

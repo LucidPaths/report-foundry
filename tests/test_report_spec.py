@@ -180,6 +180,13 @@ def test_compile_report_spec_is_strict_tool_feed() -> None:
     assert all(section.blocks for section in spec.sections)
     assert all(claim.fact_ids for section in spec.sections for claim in section.claims)
     assert spec.visuals[0].provenance_fact_ids == ["fact_starlink", "fact_launch"]
+    evidence_map = spec.visuals[0].plain_text_payload
+    assert "SpaceX launch registry fixture" in evidence_map
+    assert "https://example.test/spacex-registry" in evidence_map
+    assert "Starlink economics depends" in evidence_map
+    assert "SpaceX IPO readiness depends on Starlink economics" in evidence_map
+    assert "fact_starlink" not in evidence_map
+    assert "src_spacex_registry" not in evidence_map
     assert spec.source_appendix.rows[0][0] == "cite_src_spacex_registry"
     assert spec.citation_source_map["cite_src_spacex_registry"] == "src_spacex_registry"
 
