@@ -41,11 +41,31 @@ def test_render_html_contains_sections_and_citations():
 def test_render_html_uses_professional_density_and_design_primitives():
     html = render_html(sample_report())
 
-    assert "page-break-before:always" not in html
     assert "rf-underlay" in html
     assert "linear-gradient" in html or "radial-gradient" in html
     assert "display:grid" in html
     assert "break-inside:avoid" in html
+
+
+def test_render_html_forces_semantic_sections_onto_new_pdf_pages():
+    html = render_html(
+        Report(
+            title="Segmented report",
+            sections=[
+                Section(title="Narrative", blocks=[TextBlock(text="Reader-facing analysis")]),
+                Section(title="Evidence-backed claims", blocks=[TextBlock(text="Claim audit")]),
+                Section(title="Visual Contract", blocks=[Figure(title="Evidence Trace Map")]),
+                Section(title="Source Appendix", blocks=[TextBlock(text="• Source — https://example.com")]),
+            ],
+        )
+    )
+
+    assert "section class='section'><h2>Narrative</h2>" in html
+    assert "section class='section segment-page'><h2>Evidence-backed claims</h2>" in html
+    assert "section class='section segment-page'><h2>Visual Contract</h2>" in html
+    assert "section class='section segment-page'><h2>Source Appendix</h2>" in html
+    assert "break-before:page" in html
+    assert "page-break-before:always" in html
 
 
 def test_render_pdf_writes_real_pdf(tmp_path: Path):
