@@ -241,7 +241,7 @@ def compile_report_spec(pack: EvidencePack) -> ReportSpec:
                     purpose=exhibit.insight,
                     preferred_tool=exhibit.renderer_route,
                     provenance_fact_ids=exhibit.fact_ids,
-                    plain_text_payload=exhibit.alt_text,
+                    plain_text_payload=exhibit.plain_text_payload or exhibit.alt_text,
                     alt_text=exhibit.alt_text,
                 )
                 for exhibit in exhibit_specs

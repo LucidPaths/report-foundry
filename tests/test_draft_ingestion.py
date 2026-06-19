@@ -77,7 +77,9 @@ def test_parse_markdown_draft_preserves_llm_written_report_and_exhibit_contract(
 
     spec = compile_report_spec(pack)
     assert any(section.title == "Banks need an exposure map before they need another AI strategy memo" for section in spec.sections)
-    assert any(visual.visual_id == "ai_risk_flow" for visual in spec.visuals)
+    visual = next(visual for visual in spec.visuals if visual.visual_id == "ai_risk_flow")
+    assert "flowchart LR" in visual.plain_text_payload
+    assert "AI infrastructure spend" in visual.plain_text_payload
 
 
 def test_compile_draft_command_turns_llm_markdown_into_foundry_artifacts(tmp_path: Path) -> None:

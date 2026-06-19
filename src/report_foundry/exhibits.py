@@ -40,6 +40,7 @@ class ExhibitSpec(BaseModel):
     data: list[ExhibitDataPoint] = Field(default_factory=list)
     renderer_route: Literal["vega_lite", "mermaid", "table", "kaleido", "image"]
     alt_text: str
+    plain_text_payload: str | None = None
     transform_provenance: list[str] = Field(default_factory=list)
 
     @field_validator("exhibit_id", "title", "insight", "alt_text")
@@ -103,6 +104,7 @@ def _spec_from_draft_exhibit(exhibit: DraftExhibit, facts_by_id: dict[str, Evide
         data=data,
         renderer_route=route,
         alt_text=f"{title}: {exhibit.purpose}",
+        plain_text_payload=exhibit.plain_text_payload,
         transform_provenance=["direct fact value mapping"] if data else [],
     )
 
