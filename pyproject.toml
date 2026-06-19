@@ -1,7 +1,7 @@
 [project]
 name = "report-foundry"
 version = "0.1.0"
-description = "AI-native evidence-to-PDF report compiler with provenance, QA, and Discord-ready artifacts."
+description = "Evidence-to-PDF report toolkit with provenance, QA, and package artifacts."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

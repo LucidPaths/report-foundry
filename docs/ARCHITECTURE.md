@@ -1,26 +1,26 @@
 # Report Foundry Architecture
 
-Report Foundry is an evidence-contract and artifact factory. A research-capable LLM/session searches, reads, and reasons over the topic, then returns structured `ResearchIntake` JSON. Foundry validates that contract and turns it into governed HTML/PDF/package artifacts. Deterministic code owns schema law, evidence validation, gate routing, rendering, verification, logs, and publishing. The LLM owns research behavior.
+Report Foundry is an evidence-contract and artifact factory. A human or external report author searches, reads, and reasons over the topic, then returns structured `ResearchIntake` JSON. Foundry validates that contract and turns it into governed HTML/PDF/package artifacts. Deterministic code owns schema law, evidence validation, gate routing, rendering, verification, logs, and publishing. The author owns research behavior.
 
 ## Product loop
 
 ```text
-keyword/topic -> LLM research session -> ResearchIntake JSON -> Foundry validation -> evidence graph -> report package
+keyword/topic -> report author -> ResearchIntake JSON -> Foundry validation -> evidence graph -> report package
 ```
 
-The foundry is not the AI provider, not the search provider, and not a crawler. Those are upstream capabilities. Foundry owns the invariant: every shipped claim/visual/layout decision must trace back to admissible source observations supplied in the contract or fail closed.
+The foundry is not the authoring provider, not the source provider, not a crawler, and not an authoring runtime. Those are upstream capabilities. Foundry owns the invariant: every shipped claim/visual/layout decision must trace back to admissible source observations supplied in the contract or fail closed.
 
 ## Pipeline
 
 ```text
-keyword/topic -> research-capable LLM/session -> observed sources/facts/claims/report text -> ResearchIntake JSON -> Foundry validation -> semantic IR/ReportSpec -> assets/charts -> HTML/PDF renderers -> QA score -> delivery
+keyword/topic -> human or external report author -> observed sources/facts/claims/report text -> ResearchIntake JSON -> Foundry validation -> semantic IR/ReportSpec -> assets/charts -> HTML/PDF renderers -> QA score -> delivery
 ```
 
 ## Responsibility law
 
 ```text
-LLM/session responsibilities:
-  - use web/search/tools available in that session
+Report author responsibilities:
+  - use whatever research tools are appropriate outside Foundry
   - observe and quote sources
   - choose relevant facts and claims
   - write report prose inside ResearchIntake
@@ -35,10 +35,10 @@ Foundry responsibilities:
   - write run logs and QA evidence
 
 Not Foundry responsibilities:
-  - autonomous web browsing without an explicit connector runtime
-  - pretending a plain model endpoint has web_search tools
+  - autonomous web browsing or authoring-runtime orchestration
+  - pretending a plain model endpoint has browsing tools
   - deciding facts without supplied source observations
-  - hand-rolling PDF geometry with the LLM
+  - hand-rolling PDF geometry with the author
 ```
 
 The factory layer is department-oriented:
@@ -55,17 +55,16 @@ qa: read/look at the final artifact, score it against the initial rubric, and ro
 
 Each department consumes a typed artifact and emits the next artifact. Gate failures name a route-back department rather than letting the pipeline continue with weak output.
 
-The Ollama Cloud newsletter path implements the contract explicitly:
+A valid run implements the contract explicitly:
 
 ```text
-Ollama /v1/models + benchmark/model-card sources
-  -> source observations (ID, URL, observed_at, SHA-256, extractor)
+observed source payloads
+  -> source observations (ID, URL/locator, observed_at, SHA-256/fingerprint, extractor)
   -> extracted facts (subject, predicate, value, source_id, quote)
   -> supported claims (fact_ids required; unsupported claims fail closed)
   -> semantic IR for QA/rendering
-  -> bounded LLM commentary (short notes only; never source of truth)
-  -> deterministic designed HTML/PDF renderers
-  -> sanitized Discord message
+  -> deterministic HTML/PDF renderers
+  -> package manifest and delivery handoff
 ```
 
 ## Principle lattice
@@ -92,7 +91,7 @@ The eight principles are:
 - Claims carry citations at span/block level.
 - A claim is invalid unless every backing fact resolves to an observed source.
 - Extractors fail closed when expected facts cannot be found in the observed payload.
-- LLMs may propose scope, sources, code, visuals, and prose, but deterministic gates decide what is admissible and shippable.
+- Authors may propose scope, sources, visuals, and prose, but deterministic gates decide what is admissible and shippable.
 - Renderers are adapters: Playwright/Chromium is the strict ReportSpec PDF backend; ReportLab remains a legacy/basic renderer; WeasyPrint/PrinceXML/Typst are future adapters.
 - Charts and diagrams should be SVG/vector-first.
 - External assets require cached hashes, license metadata, alt text, and attribution.
@@ -103,8 +102,8 @@ The eight principles are:
 The same core should run as:
 
 - CLI/library for local report runs.
-- MCP server for Claude, ChatGPT, Ollama-backed agents, Hermes, and other tool-using clients.
-- Server/queue deployment where companies connect databases, document stores, APIs, and internal MCP tools.
+- API/server adapter for external tools that want to submit or compile ResearchIntake packages.
+- Server/queue deployment where companies connect databases, document stores, APIs, and internal source tools.
 
 External and internal information enter through connectors, but the connector does not bypass source law: every ingested item must become a source observation with ID, timestamp, hash/fingerprint, trust tier, and extraction provenance.
 

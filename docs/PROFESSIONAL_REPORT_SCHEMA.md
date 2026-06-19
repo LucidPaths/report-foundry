@@ -1,6 +1,6 @@
 # Professional Report Content Schema
 
-Report Foundry must not render schema debris as a report. The AI/research layer writes into a reader-facing professional report contract; the foundry validates that contract, preserves evidence links, and renders it through software.
+Report Foundry must not render schema debris as a report. The authoring/research layer writes into a reader-facing professional report contract; the foundry validates that contract, preserves evidence links, and renders it through software.
 
 ## Observed public patterns
 

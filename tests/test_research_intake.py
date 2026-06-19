@@ -51,7 +51,7 @@ def valid_intake_payload() -> dict[str, object]:
                 "locator": "https://source.test/a",
                 "publication_date": None,
                 "observed_at": "2026-06-18T12:00:00Z",
-                "access_method": "research_intake_llm",
+                "access_method": "research_intake_authored",
                 "content_hash": "a" * 64,
                 "reliability": "medium",
                 "reliability_rationale": "The payload was provided and directly quoted.",
@@ -168,7 +168,7 @@ def test_research_intake_prompt_is_uploaded_research_foundry_system_prompt() -> 
     lowered = prompt.lower()
 
     assert prompt.startswith("# Report Foundry Research Intake System Prompt")
-    assert "You are the Report Foundry Research Intake Worker." in prompt
+    assert "You are using the Report Foundry Research Intake Contract." in prompt
     assert "# 1. Core Law" in prompt
     assert "# 4. Research Workflow" in prompt
     assert "# 8. Report Writing Standards" in prompt
@@ -235,12 +235,12 @@ def test_research_intake_schema_matches_uploaded_prompt_top_level_shape() -> Non
 def test_valid_research_intake_converts_to_evidence_pack() -> None:
     intake = ResearchIntake.model_validate(valid_intake_payload())
 
-    pack = research_intake_to_evidence_pack(intake, author="Research Intake LLM")
+    pack = research_intake_to_evidence_pack(intake, author="Research Intake Author")
     gate = validate_evidence_pack(pack)
 
     assert gate.ok, [check.code for check in gate.checks]
     assert pack.title == "Operator keyword report"
-    assert pack.author == "Research Intake LLM"
+    assert pack.author == "Research Intake Author"
     assert pack.scope["topic"] == "operator supplied keyword"
     assert pack.sources[0].source_id == "source_a"
     assert pack.facts[0].source_id == "source_a"
@@ -276,7 +276,7 @@ def test_research_intake_rejects_section_without_claim_support() -> None:
         research_intake_to_evidence_pack(ResearchIntake.model_validate(payload))
 
 
-def test_compile_intake_cli_turns_structured_llm_output_into_package(tmp_path: Path) -> None:
+def test_compile_intake_cli_turns_structured_authored_output_into_package(tmp_path: Path) -> None:
     intake_path = tmp_path / "research_intake.json"
     out_dir = tmp_path / "compiled"
     intake_path.write_text(json.dumps(valid_intake_payload(), indent=2), encoding="utf-8")

@@ -1,4 +1,4 @@
-"""Markdown draft ingestion for LLM-written reports.
+"""Markdown draft ingestion for authored reports.
 
 Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed; RF-P6 Visuals Are Claims; RF-P8 Low Floor, High Ceiling.
 """
@@ -16,10 +16,10 @@ _DIRECTIVE = re.compile(r"^:::(?P<kind>source|claim|exhibit)\s*$", re.MULTILINE)
 _HEADING = re.compile(r"^(#{1,2})\s+(.+?)\s*$", re.MULTILINE)
 
 
-def parse_markdown_draft(markdown: str, *, author: str = "Research LLM", observed_at: str | None = None) -> EvidencePack:
-    """Parse an LLM-authored Markdown report into the Foundry evidence spine.
+def parse_markdown_draft(markdown: str, *, author: str = "Research Author", observed_at: str | None = None) -> EvidencePack:
+    """Parse an authored Markdown report into the Foundry evidence spine.
 
-    The LLM owns the report prose and visual intent. This parser only normalizes
+    The report author owns the report prose and visual intent. This parser only normalizes
     sources, claims, sections, and exhibit directives so existing compiler and
     renderer adapters can do their one job.
     """
@@ -36,17 +36,17 @@ def parse_markdown_draft(markdown: str, *, author: str = "Research LLM", observe
     return EvidencePack(
         title=title,
         author=author,
-        scope={"input": "llm_markdown_draft", "audience": "report readers"},
+        scope={"input": "authored_markdown_draft", "audience": "report readers"},
         sources=sources,
         facts=facts,
         claims=claims,
         report_sections=sections,
         exhibits=exhibits,
-        tags=["llm-draft", "compiled-draft"],
+        tags=["authored-draft", "compiled-draft"],
     )
 
 
-def parse_markdown_draft_file(path: Path, *, author: str = "Research LLM") -> EvidencePack:
+def parse_markdown_draft_file(path: Path, *, author: str = "Research Author") -> EvidencePack:
     return parse_markdown_draft(path.read_text(encoding="utf-8"), author=author)
 
 
@@ -139,7 +139,7 @@ def _source_observations(blocks: list[dict[str, str]], observed_at: str) -> list
                 url=url,
                 observed_at=observed_at,
                 content_sha256=hashlib.sha256(payload).hexdigest(),
-                extractor="llm-draft-directive",
+                extractor="authored-draft-directive",
                 locator="markdown :::source",
             )
         )

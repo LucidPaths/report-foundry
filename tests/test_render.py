@@ -12,7 +12,7 @@ from report_foundry.render import render_html, render_pdf
 def sample_report():
     return Report(
         title="Daily Systems Brief",
-        subtitle="AI-native report pipeline smoke test",
+        subtitle="Evidence-backed report pipeline smoke test",
         sections=[
             Section(
                 title="Model Signals",

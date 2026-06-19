@@ -150,7 +150,7 @@ class ProfessionalReportContent(BaseModel):
 
 
 class DraftExhibit(BaseModel):
-    """Visual intent selected by the LLM/report writer and rendered by adapters."""
+    """Visual intent selected by the report author and rendered by adapters."""
 
     visual_id: str
     visual_type: Literal["evidence_map", "chart", "matrix", "timeline", "diagram"] = "diagram"

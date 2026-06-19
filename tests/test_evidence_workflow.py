@@ -20,16 +20,16 @@ from report_foundry.qa import run_quality_gates
 
 def make_pack() -> EvidencePack:
     return EvidencePack(
-        title="Mechanical model brief",
+        title="Mechanical market brief",
         scope={
-            "question": "Which models are live and what can we truthfully claim?",
-            "audience": "agent workflow test",
+            "question": "Which suppliers are qualified and what can we truthfully claim?",
+            "audience": "report workflow test",
         },
         sources=[
             SourceObservation(
-                source_id="ollama-models",
-                title="Ollama /v1/models fixture",
-                url="https://ollama.com/v1/models",
+                source_id="supplier-registry",
+                title="Supplier registry fixture",
+                url="https://example.com/supplier-registry",
                 observed_at="2026-06-17T00:00:00Z",
                 content_sha256="a" * 64,
                 extractor="fixture",
@@ -37,18 +37,18 @@ def make_pack() -> EvidencePack:
         ],
         facts=[
             EvidenceFact(
-                fact_id="fact:model-live:glm-5.2",
-                subject="glm-5.2",
-                predicate="is_live_model_id",
+                fact_id="fact:supplier-qualified:acme",
+                subject="acme-supply",
+                predicate="is_qualified_supplier_id",
                 value="true",
-                source_id="ollama-models",
-                quote="glm-5.2",
+                source_id="supplier-registry",
+                quote="acme-supply",
             )
         ],
         claims=[
             EvidenceClaim(
-                text="glm-5.2 is a live Ollama Cloud model ID.",
-                fact_ids=["fact:model-live:glm-5.2"],
+                text="acme-supply is a qualified supplier ID.",
+                fact_ids=["fact:supplier-qualified:acme"],
                 confidence="high",
             )
         ],
@@ -69,7 +69,7 @@ def test_evidence_pack_fails_closed_on_unsupported_claim() -> None:
         update={
             "claims": [
                 EvidenceClaim(
-                    text="kimi-k2.7-code is faster than glm-5.2.",
+                    text="kimi-k2.7-code is faster than acme-supply.",
                     fact_ids=["missing:fact"],
                     confidence="high",
                 )
@@ -89,13 +89,13 @@ def test_build_report_from_evidence_preserves_claim_citations() -> None:
     report = build_report_from_evidence(pack)
     qa = run_quality_gates(report)
 
-    assert report.title == "Mechanical model brief"
+    assert report.title == "Mechanical market brief"
     assert qa.ok
     [claim] = report.claims()
-    assert claim.text == "glm-5.2 is a live Ollama Cloud model ID."
+    assert claim.text == "acme-supply is a qualified supplier ID."
     assert claim.verification_status == "supported"
-    assert claim.citations[0].source_id == "ollama-models"
-    assert claim.citations[0].quote == "glm-5.2"
+    assert claim.citations[0].source_id == "supplier-registry"
+    assert claim.citations[0].quote == "acme-supply"
 
 
 def test_build_report_from_evidence_refuses_invalid_pack() -> None:

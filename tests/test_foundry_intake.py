@@ -1,4 +1,4 @@
-"""Foundry intake tests for provider/key-reference contracts.
+"""Foundry intake tests for topic/source-namespace contracts.
 
 Lattice: RF-P3 Provider and Renderer Agnosticism; RF-P7 Secrets Stay Handles.
 """
@@ -11,24 +11,18 @@ from pydantic import ValidationError
 from report_foundry.factory import FoundryRunRequest, build_foundry_run_request
 
 
-def test_foundry_run_request_is_keyword_plus_user_connected_ai_key_reference() -> None:
+def test_foundry_run_request_is_keyword_plus_optional_source_namespaces() -> None:
     request = build_foundry_run_request(
         keyword="current SpaceX IPO launch newsletter",
-        ai_provider="openai-compatible",
-        ai_api_key_env_var="USER_AI_API_KEY",
-        search_provider="ai-search",
+        source_namespaces=["company-db", "public-web"],
         audience="executive readers",
     )
 
     assert request.keyword == "current SpaceX IPO launch newsletter"
     assert request.audience == "executive readers"
-    assert request.ai.provider == "openai-compatible"
-    assert request.ai.api_key_env_var == "USER_AI_API_KEY"
-    assert request.search.provider == "ai-search"
-    assert request.search.api_key_env_var == "USER_AI_API_KEY"
+    assert request.source_namespaces == ["company-db", "public-web"]
     assert request.pipeline == [
         "keyword_intake",
-        "ai_search",
         "source_observation",
         "fact_extraction",
         "claim_synthesis",
@@ -37,17 +31,17 @@ def test_foundry_run_request_is_keyword_plus_user_connected_ai_key_reference() -
     ]
 
 
-def test_foundry_run_request_never_accepts_raw_api_key_fields() -> None:
+def test_foundry_run_request_rejects_provider_credentials_as_core_fields() -> None:
     with pytest.raises(ValidationError):
         FoundryRunRequest.model_validate(
             {
                 "keyword": "SpaceX IPO",
-                "ai": {"provider": "openai-compatible", "api" + "_key": "raw-key-field-is-forbidden"},
-                "search": {"provider": "ai-search", "api_key_env_var": "USER_AI_API_KEY"},
+                "ai": {"provider": "vendor", "api" + "_key": "raw-key-field-is-forbidden"},
+                "provider_runtime": {"provider": "search", "credential_ref": "USER_SECRET"},
             }
         )
 
 
 def test_foundry_run_request_requires_non_empty_keyword() -> None:
     with pytest.raises(ValidationError):
-        build_foundry_run_request(keyword="   ", ai_provider="openai-compatible", ai_api_key_env_var="USER_AI_API_KEY")
+        build_foundry_run_request(keyword="   ")

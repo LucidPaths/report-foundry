@@ -50,7 +50,7 @@ def test_plan_run_cli_writes_factory_run_package(tmp_path) -> None:
             "--out-dir",
             str(out_dir),
             "--integration-mode",
-            "mcp",
+            "adapter",
             "--source",
             "company-db",
             "--source",
@@ -64,20 +64,20 @@ def test_plan_run_cli_writes_factory_run_package(tmp_path) -> None:
     assert (out_dir / "manifest.json").exists()
     assert (out_dir / "source_plan.json").exists()
     assert (out_dir / "visual_plan.json").exists()
-    assert (out_dir / "worker_plan.json").exists()
+    assert (out_dir / "execution_plan.json").exists()
 
     manifest = json.loads((out_dir / "manifest.json").read_text(encoding="utf-8"))
     source_plan = json.loads((out_dir / "source_plan.json").read_text(encoding="utf-8"))
     visual_plan = json.loads((out_dir / "visual_plan.json").read_text(encoding="utf-8"))
-    worker_plan = json.loads((out_dir / "worker_plan.json").read_text(encoding="utf-8"))
+    execution_plan = json.loads((out_dir / "execution_plan.json").read_text(encoding="utf-8"))
 
-    assert manifest["integration_mode"] == "mcp"
+    assert manifest["integration_mode"] == "adapter"
     assert manifest["run_mode"] == "fixture"
     assert "company-db" in manifest["connected_sources"]
     assert any(item["dimension"] == "starlink_economics" for item in source_plan["items"])
     assert any(item["visual_id"] == "business_segment_map" for item in visual_plan["items"])
-    assert any(task["worker_id"] == "research-starlink-economics" for task in worker_plan["tasks"])
-    assert any(task["worker_id"] == "qa-final-gates" for task in worker_plan["tasks"])
+    assert any(task["task_id"] == "research-starlink-economics" for task in execution_plan["tasks"])
+    assert any(task["task_id"] == "qa-final-gates" for task in execution_plan["tasks"])
 
 
 def test_plan_run_cli_persists_product_run_mode(tmp_path) -> None:

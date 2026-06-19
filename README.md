@@ -1,24 +1,24 @@
 # Report Foundry
 
-AI-native report foundry: an LLM research session returns structured evidence, and Foundry turns that contract into a grounded report package.
+Report Foundry is a software toolkit for turning structured research into governed report artifacts.
 
 Canonical product loop:
 
 ```text
 user enters a keyword/topic
-research-capable LLM/session searches, reads, and reasons over sources
-LLM returns ResearchIntake JSON: sources, facts, claims, sections, exhibits
+human or external report author searches, reads, and reasons over sources
+author returns ResearchIntake JSON: sources, facts, claims, sections, exhibits
 Foundry validates the contract and provenance links
 Foundry builds the report package: evidence graph, visuals, layout, QA, export
 ```
 
-Architecture law: the LLM owns research behavior; Foundry owns evidence contracts, validation, rendering, logs, QA, and packaging. Foundry does not pretend to browse/search unless a separate connector/tool runtime explicitly provides observed payloads.
+Architecture law: the report author owns research behavior; Foundry owns evidence contracts, validation, rendering, logs, QA, and packaging. Foundry does not pretend to browse/search or require a model runtime to operate.
 
-The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LATTICE.md). [`CLAUDE.md`](CLAUDE.md) mirrors the HiveMind-style operating layer: lattice summary, things to avoid, and pre-commit verification checks. Python source, scripts, and tests declare their local doctrine with a `Lattice:` notation in the file description; the test suite fails if new Python files omit or misname it.
+The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LATTICE.md). Python source, scripts, and tests declare their local doctrine with a `Lattice:` notation in the file description; the test suite fails if new Python files omit or misname it.
 
 ## What exists now
 
-- Top-level foundry intake contract: keyword/topic plus user-connected AI/search provider references.
+- Top-level foundry intake contract: keyword/topic plus user-connected resource provider references.
 - Pydantic report IR: sections, text, claims, citations, figures, metric cards, tables.
 - Quality gates: unsupported claims, missing alt text warnings, ragged tables.
 - HTML renderer for preview/share.
@@ -26,8 +26,8 @@ The governing doctrine lives in [`docs/PRINCIPLE_LATTICE.md`](docs/PRINCIPLE_LAT
 - Software-backed PDF renderer via Playwright/Chromium for strict ReportSpec compilation.
 - CLI: `reportfoundry validate`, `reportfoundry build`, `reportfoundry plan-run`, and fixture adapter `reportfoundry research-run`.
 - Example report fixture.
-- Analyst-factory contracts: case rubric, source plan, visual plan, worker plan, gate routing.
-- ResearchIntake contract: schema-only LLM researcher prompt, structured full-report intake JSON, validation, and conversion to EvidencePack.
+- Analyst-factory contracts: case rubric, source plan, visual plan, execution plan, gate routing.
+- ResearchIntake contract: schema-only authoring prompt, structured full-report intake JSON, validation, and conversion to EvidencePack.
 
 ## Quick start
 
@@ -46,13 +46,13 @@ Outputs:
 
 ## One-command research-intake smoke loop
 
-Use `glm-run` for end-to-end Foundry verification. It creates a research gate
-package, loads or requests a `ResearchIntake`, validates it, compiles artifacts,
+Use `intake-run` for end-to-end Foundry verification. It creates a research gate
+package, loads a supplied `ResearchIntake`, validates it, compiles artifacts,
 runs artifact QA, and ends with a clean user handoff. This is a contract/render
-loop, not a web-search crawler.
+loop, not a web-search crawler or authoring-runtime runner.
 
 ```bash
-uv run reportfoundry glm-run \
+uv run reportfoundry intake-run \
   --topic "nvidia company history" \
   --intake-json path/to/research_intake.json \
   --out-dir .foundry_runs/nvidia-history
@@ -70,31 +70,28 @@ run log: .foundry_runs/nvidia-history/run_log.json
 ```
 
 Each run writes structured logs with step names, timings, statuses, adequacy
-warnings, artifact QA checks, and artifact paths. Live GLM execution uses the
-OpenAI-compatible Ollama endpoint when `OLLAMA_API_KEY` is present, but Foundry
-does not supply web/search tools to that endpoint. For real research, run the
-prompt in a web-capable LLM session and pass the resulting JSON with
-`--intake-json`. Deterministic CI/local tests should also pass `--intake-json`.
+warnings, artifact QA checks, and artifact paths. Foundry does not call a model
+or provide source-acquisition tools. Humans, external or tool-assisted authoring sessions, or external research systems
+write the `ResearchIntake`; Foundry validates and renders it.
 
 Scratch run directories are ignored by git via `.foundry_runs/`, `.foundry_*/`,
 `.verify_tmp/`, and `foundry_verify_*/`.
 
 ## Foundry run shape
 
-The real product run starts when a user submits a keyword/topic to a research-capable LLM/session. Provider keys are referenced through environment/config; raw secrets are not stored in run manifests.
+The real product run starts when a user supplies a topic and a ResearchIntake authored by a human, model-assisted authoring session, or external research system. Raw secrets are not stored in run manifests.
 
 ```text
 FoundryRunRequest
   keyword: "current SpaceX IPO launch newsletter"
-  ai: provider + api_key_env_var
-  search: provider + api_key_env_var
+  source_namespaces: ["company-db", "public-web"]
 ```
 
 Execution target:
 
 ```text
 keyword/topic
-  -> LLM research session uses web/search tools outside Foundry
+  -> human or external report author observes sources outside Foundry
   -> ResearchIntake JSON: observed sources, facts, claims, report text, exhibits
   -> Foundry validates IDs, citations, provenance, adequacy, and schema
   -> Foundry compiles EvidencePack -> ReportSpec -> HTML/PDF/package
@@ -103,22 +100,22 @@ keyword/topic
 
 Responsibility split:
 
-- LLM/session: search, read, quote, compare, reason, choose relevant facts, draft report text inside the schema.
+- Report author: search, read, quote, compare, reason, choose relevant facts, draft report text inside the schema.
 - Foundry: prompt/schema law, strict validation, claim/source link checks, adequacy warnings, renderer routing, PDF/HTML/package generation, run logs, artifact QA.
-- Not Foundry: general web crawling, autonomous browsing, secret management beyond env-var handles, or deciding facts without supplied evidence.
+- Not Foundry: general web crawling, source browsing, authoring-runtime orchestration, provider secret orchestration, or deciding facts without supplied evidence.
 
 
-## Strict ResearchIntake for LLM researchers
+## Strict ResearchIntake for report authors
 
-The LLM researcher is allowed to decide what sources, facts, claims, sections, contradictions, uncertainty notes, and exhibit proposals matter for the operator-provided keyword. It is not allowed to free-write an unstructured report or invent its own output shape.
+The report author is allowed to decide what sources, facts, claims, sections, contradictions, uncertainty notes, and exhibit proposals matter for the operator-provided keyword. The author may be human or external. They are not allowed to free-write an unstructured report or invent their own output shape.
 
-Generate the schema-only prompt for the researcher:
+Generate the schema-only prompt for the report author:
 
 ```bash
 uv run reportfoundry research-intake-prompt --output prompts/research_intake_system.md
 ```
 
-Compile strict LLM output into the Foundry pipeline:
+Compile strict author output into the Foundry pipeline:
 
 ```bash
 uv run reportfoundry compile-intake research_intake.json --out-dir .output_intake
@@ -128,7 +125,7 @@ uv run reportfoundry compile-intake research_intake.json --out-dir .output_intak
 
 ```text
 operator keyword/request
-  -> LLM researcher returns ResearchIntake JSON only
+  -> report author returns ResearchIntake JSON only
   -> Foundry validates sources/facts/claims/sections/exhibits
   -> EvidencePack
   -> ReportSpec
@@ -145,7 +142,7 @@ Create the first executable factory package from a keyword/topic before source a
 ```bash
 uv run reportfoundry plan-run "current SpaceX IPO launch newsletter" \
   --audience "executive readers" \
-  --integration-mode mcp \
+  --integration-mode adapter \
   --source company-db \
   --source web \
   --out-dir .factory-run/spacex-ipo
@@ -157,14 +154,14 @@ Outputs:
 - `rubric.json` — case-specific report law created before research/rendering.
 - `source_plan.json` — required source coverage per inferred dimension.
 - `visual_plan.json` — provenance-required chart/map/matrix/timeline contracts.
-- `worker_plan.json` — HIVE-style executable topology: research workers per source dimension, synthesis worker, visual workers, final QA worker, shared scratchpad sections, dependency edges, completion signals, and health checks.
+- `execution_plan.json` — neutral pipeline topology: research, synthesis, visual, and QA tasks with dependency edges, expected outputs, completion signals, and health checks.
 - `initial_gate_result.json` — fail-closed route-back result. A new run with no observed evidence should route to Research.
 
 This is a planning package, not a completed deep-research report. Research/connectors must satisfy the source plan before synthesis/rendering can ship.
 
 ### Fixture adapter: local marked sources
 
-`research-run` is a development/test adapter, not the product search path. It exists so the foundry can be tested without calling an AI/search provider. It creates an evidence pack from local `.md`/`.txt` files whose claims are explicitly marked against the source plan:
+`research-run` is a development/test adapter, not the product search path. It exists so the foundry can be tested without calling any external resource provider. It creates an evidence pack from local `.md`/`.txt` files whose claims are explicitly marked against the source plan:
 
 ```bash
 uv run reportfoundry research-run .factory-run/spacex-ipo \
@@ -208,34 +205,7 @@ Outputs:
 - `render_gate_result.json` and `*.render_artifact.json` — renderer route result and renderer artifact manifest.
 - `*.package_manifest.json` — canonical package manifest listing package artifacts, gates, source paths, route, run mode, and success/failure status. The manifest indexes the package; it is returned by the CLI but not listed inside its own `artifacts` map.
 
-This is the first practical version of the foundry toolkit model: LLM/research fills a strict plain-text+structured spec, Foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance. The PDF route uses Chromium as the layout engine; the LLM does not hand-edit PDF geometry.
-
-## Ollama Cloud newsletter path
-
-Generate a live model brief from Ollama Cloud. The script now writes a mechanically sourced evidence pack, semantic IR, designed HTML preview, deterministic PDF, and Discord-ready attachment message:
-
-```bash
-uv run python scripts/ollama_daily_newsletter.py --out-dir .output
-uv run reportfoundry validate .output/ollama_cloud_field_brief.json
-```
-
-The script expects `OLLAMA_API_KEY` in the environment or in the local Hermes `.env`. It does not print the key.
-
-Outputs:
-
-- `.output/ollama_cloud_field_brief.evidence.json` — scope, live checks, observed sources with hashes, extracted facts, supported claims, benchmark metrics, toolchain, layout contract.
-- `.output/ollama_cloud_field_brief.json` — Report Foundry IR for generic validation/rendering.
-- `.output/ollama_cloud_field_brief_designed.html` — newsletter preview.
-- `.output/ollama_cloud_field_brief_designed.pdf` — polished PDF artifact with scope, pipeline, model cards, benchmark bars, and source footer.
-- `.output/ollama_cloud_field_brief_designed.discord.md` — sanitized Discord message with PDF attachment path.
-
-Mechanical contract:
-
-```text
-observed source payload -> SHA-256 source record -> extracted fact -> supported claim -> Report Foundry IR -> PDF
-```
-
-The workflow fails closed when required source data is missing or a claim references an unknown fact. The LLM is allowed to generate bounded commentary only. It does not choose report scope, sources, layout, charts, citations, or PDF structure.
+This is the first practical version of the foundry toolkit model: a report author fills a strict plain-text+structured spec, Foundry routes that spec into software tools, and gates reject missing source/claim/visual provenance. The PDF route uses Chromium as the layout engine; the author does not hand-edit PDF geometry.
 
 ## Strategy truth
 

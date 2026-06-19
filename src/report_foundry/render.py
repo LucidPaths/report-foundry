@@ -114,7 +114,7 @@ def render_html_pdf_with_chromium(html_path: str | Path, output_path: str | Path
     """Render an HTML/CSS report to PDF using Chromium's print engine.
 
     This is the software-backed foundry path: the report/spec becomes HTML/CSS,
-    then a browser layout engine paginates and prints it. No LLM page drawing.
+    then a browser layout engine paginates and prints it. No author-controlled page drawing.
     """
 
     html_path = Path(html_path).resolve()

@@ -225,7 +225,7 @@ def test_write_run_package_persists_manifest_plans_and_initial_gate_result(tmp_p
         topic="current SpaceX IPO launch newsletter",
         audience="executive readers",
         out_dir=out_dir,
-        integration_mode="mcp",
+        integration_mode="adapter",
         connected_sources=["company-db", "web"],
         run_mode=RunMode.PRODUCT,
     )

@@ -9,7 +9,6 @@ import hashlib
 import json
 import re
 from datetime import datetime, timezone
-from enum import StrEnum
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -18,13 +17,6 @@ from .evidence import SourceObservation, SourceTier
 from .factory import Department, FactoryGateCheck, RunMode, SourcePlan
 from .research import ResearchEvidenceGap, ResearchRunLog, ResearchSourceCandidate
 
-
-class ConnectorKind(StrEnum):
-    GPT_RESEARCHER = "gpt_researcher"
-    STORM = "storm"
-    PAPERQA = "paperqa"
-    MCP = "mcp"
-    LOCAL_FIXTURE = "local_fixture"
 
 
 ArtifactStatus = Literal["fixture", "product", "experiment"]

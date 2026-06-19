@@ -1,6 +1,6 @@
 """Fixture adapter for local marked sources.
 
-This is not the product AI/search path. It exercises the foundry
+This is not the product source-acquisition path. It exercises the foundry
 source-observation -> fact -> claim -> gate contract without external calls.
 
 Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed; RF-P8 Low Floor, High Ceiling.

@@ -1,4 +1,4 @@
-"""Fixture research-worker tests for dimension coverage and route-back behavior.
+"""Fixture research-fixture tests for dimension coverage and route-back behavior.
 
 Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed.
 """

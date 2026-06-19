@@ -46,7 +46,7 @@ Every shipped fact, claim, chart, and layout decision must originate from an obs
 
 - `SourceObservation` carries source ID, title, URL, observed timestamp, SHA-256, extractor, and locator.
 - Evidence packs store source observations separately from facts and claims.
-- The Ollama newsletter path hashes observed payloads before claims enter the report.
+- Observed payload fixtures are hashed before claims enter the report.
 - Local marked-source research is labeled as a fixture adapter, not a truth oracle.
 
 **Demands:**
@@ -82,7 +82,7 @@ A claim is admissible only when it resolves through fact IDs to extracted facts 
 
 > *Interfaces are permanent. Providers and renderers are replaceable.*
 
-Report Foundry is the invariant system. AI/search providers, internal databases, MCP tools, renderers, and PDF engines are adapters. Swapping one should not rewrite report law.
+Report Foundry is the invariant system. Research providers, internal databases, source tools, renderers, and PDF engines are adapters. Swapping one should not rewrite report law.
 
 **Instantiations:**
 
@@ -93,7 +93,7 @@ Report Foundry is the invariant system. AI/search providers, internal databases,
 
 **Demands:**
 
-- New AI/search provider = connector adapter, not factory rewrite.
+- New research provider = connector adapter, not factory rewrite.
 - New renderer = renderer adapter, not evidence/QA rewrite.
 - Core logic must avoid hardcoded model/provider assumptions.
 
@@ -169,9 +169,8 @@ User API keys and internal credentials may enable connectors, but raw secrets mu
 
 **Instantiations:**
 
-- `ConnectedProvider` stores `api_key_env_var`, not a key value.
+- Core run requests store topic and optional source namespaces, not provider credentials or raw keys.
 - Intake models forbid extra raw key fields.
-- Newsletter script loads `OLLAMA_API_KEY` from environment/Hermes `.env` without printing it.
 - Discord-ready output is sanitized before external delivery.
 
 **Demands:**

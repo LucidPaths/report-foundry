@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Report Foundry should not become another deep-research agent. Existing open-source systems already perform retrieval, query decomposition, multi-agent research, RAG over documents, citation display, and Markdown/PDF report export.
+Report Foundry should not become another deep-research system. Existing open-source systems already perform retrieval, query decomposition, multi-step research, RAG over documents, citation display, and Markdown/PDF report export.
 
 Report Foundry should become the governed artifact layer around those systems:
 
@@ -29,7 +29,7 @@ The product value is making research outputs **safe, inspectable, and publishabl
 
 Verified current state from repo docs and implementation:
 
-- `FoundryRunRequest`, `ReportRunManifest`, `ReportRubric`, `SourcePlan`, `VisualPlan`, `WorkerTask`, and `FactoryGateResult` exist.
+- `FoundryRunRequest`, `ReportRunManifest`, `ReportRubric`, `SourcePlan`, `VisualPlan`, `PipelineTask`, `ExecutionPlan`, and `FactoryGateResult` exist.
 - `reportfoundry plan-run` persists a planning package.
 - `reportfoundry research-run` is a deterministic local fixture path, not product search.
 - `ResearchRunLog` now exists for fixture research and records selected sources, extraction steps, and evidence gaps.
@@ -41,38 +41,38 @@ Verified current state from repo docs and implementation:
 
 ## Prior art reality
 
-### Deep-research / report agents already exist
+### Deep-research / report systems already exist
 
 These systems cover research execution, RAG, citations, and report/article generation. Report Foundry should adapter-wrap them rather than duplicate them.
 
-- [GPT Researcher](https://github.com/assafelovic/gpt-researcher)
-  - Autonomous web/local research, planner/executor/publisher pattern, reports with citations, PDF/Word export.
+- external research-system output
+  - External research and publishing workflows with citations and document export.
   - Gap: no strict source-observation/fact/claim ledger, no fail-closed product gates, no governed renderer/citation/exhibit adapter layer.
 
-- [STORM](https://github.com/stanford-oval/storm) / [STORM research preview](https://storm.genie.stanford.edu/)
+- External outline-first research systems
   - Paper: [Assisting in Writing Wikipedia-like Articles From Scratch with Large Language Models](https://arxiv.org/abs/2402.14207)
   - Pre-writing research, multi-perspective question asking, references, outline, long-form cited article generation.
   - Gap: encyclopedic article workflow, not governed report artifact factory.
 
-- [Co-STORM](https://arxiv.org/abs/2408.15232)
+- Collaborative research-system patterns
   - Collaborative knowledge curation, human steering, unknown-unknown discovery.
   - Gap: exploration and discourse, not deterministic evidence gates or artifact packaging.
 
 - [LangChain Open Deep Research](https://github.com/langchain-ai/open_deep_research)
-  - LangGraph supervisor/sub-researcher orchestration with search/MCP/model configurability and cited reports.
+  - External multi-step research workflows with source collection, synthesis, and cited reports.
   - Gap: prompt-enforced citations, not structural claim admissibility.
 
 - [Open Deep Research / dzhng](https://github.com/dzhng/deep-research)
-  - Minimal iterative breadth/depth research agent and Markdown report with sources.
+  - Minimal iterative breadth/depth research workflow and Markdown report with sources.
   - Gap: useful small implementation, but little governance or publication machinery.
 
 - [PaperQA](https://github.com/Future-House/paper-qa) / PaperQA2
-  - Paper: [Language agents achieve superhuman synthesis of scientific knowledge](https://arxiv.org/abs/2409.13740)
+  - Paper: [Language systems achieve superhuman synthesis of scientific knowledge](https://arxiv.org/abs/2409.13740)
   - Strong scientific-paper RAG, cited summaries, contradiction-oriented scientific synthesis.
   - Gap: scientific QA/synthesis substrate, not a general professional report factory.
 
 - [Khoj](https://github.com/khoj-ai/khoj), [DocsGPT](https://github.com/arc53/DocsGPT), [deep-searcher](https://github.com/zilliztech/deep-searcher)
-  - Private document search, agents, automations, RAG, enterprise/private-data retrieval.
+  - Private document search, automations, RAG, enterprise/private-data retrieval.
   - Gap: search/assistant products, not fail-closed evidence-to-report artifact factories.
 
 ### Publishing/citation/exhibit tooling already exists
@@ -112,7 +112,7 @@ This roadmap is constrained by the Report Foundry Principle Lattice:
 
 - **RF-P1 Source Sovereignty:** connector outputs must become observed sources with hashes/metadata before claims are admitted.
 - **RF-P2 Claim Traceability:** no generated report text becomes valid unless claims resolve to facts and facts resolve to source observations.
-- **RF-P3 Provider and Renderer Agnosticism:** GPT Researcher, STORM, PaperQA, Pandoc, Typst, CSL, Vega, and Playwright are adapters, not core law.
+- **RF-P3 Provider and Renderer Agnosticism:** External research systems, citation tools, exhibit tools, and renderers are adapters, not core law.
 - **RF-P4 Gates Fail Closed:** product mode blocks unsupported/missing evidence instead of degrading to best-effort prose.
 - **RF-P5 Case Law Before Generation:** rubric/source plan/visual plan are established before research and writing.
 - **RF-P6 Visuals Are Claims:** charts, diagrams, maps, timelines, and tables need provenance fact IDs and transform metadata.
@@ -137,13 +137,13 @@ The current repo has `SourcePlan`, `ResearchRunLog`, and `EvidencePack`, but no 
 
 Initial adapter candidates:
 
-1. **GPT Researcher adapter**
+1. **external research-system adapter**
    - Source: https://github.com/assafelovic/gpt-researcher
    - Best for: general web/local-document reports with existing citation/report output.
    - Likely ingest formats: generated Markdown, source/citation lists, JSON/log artifacts if available.
    - Risk: its citations are not claim-law; Foundry must re-normalize.
 
-2. **STORM adapter**
+2. **External research adapter**
    - Source: https://github.com/stanford-oval/storm
    - Paper: https://arxiv.org/abs/2402.14207
    - Best for: broad topic exploration, perspectives, outline/reference generation.
@@ -157,7 +157,7 @@ Initial adapter candidates:
    - Likely ingest formats: cited answer, paper metadata, passages, document IDs.
    - Risk: scientific domain assumptions; not generic consulting/investor reports.
 
-4. **MCP / local source adapter**
+4. **External/local source adapter**
    - Best for: company docs, internal APIs, user-provided corpora.
    - Risk: tenant trust policy and secrets handling must be explicit.
 
@@ -171,14 +171,6 @@ Create:
 Suggested models:
 
 ```python
-class ConnectorKind(StrEnum):
-    GPT_RESEARCHER = "gpt_researcher"
-    STORM = "storm"
-    PAPERQA = "paperqa"
-    MCP = "mcp"
-    LOCAL_FIXTURE = "local_fixture"
-
-
 class ConnectorRequest(BaseModel):
     run_id: str
     topic: str
@@ -271,7 +263,7 @@ Write failing tests for:
 
 Implemented in `src/report_foundry/connectors.py` with tests in `tests/test_connectors.py`:
 
-- `ConnectorAdapter` protocol plus `ConnectorRequest`, `ConnectorResult`, `ConnectorSourceCandidate`, `ConnectorKind`, and initial `RunMode`.
+- `ConnectorAdapter` protocol plus `ConnectorRequest`, `ConnectorResult`, `ConnectorSourceCandidate`, and initial `RunMode`.
 - Public connector models use `extra="forbid"`; raw secret-like fields and raw secret-looking credential handles are rejected.
 - `FakeConnectorAdapter` converts selected candidates into hashed `SourceObservation` records with observed timestamps.
 - Connector handoff produces a `ResearchRunLog` carrying candidate decisions and `ResearchEvidenceGap` entries for uncovered required dimensions.
@@ -855,7 +847,7 @@ Remaining / not claimed:
 
 ---
 
-# Cross-cutting worker/execution handoff
+# Cross-cutting execution handoff
 
 The five points above need one execution seam:
 
@@ -897,16 +889,16 @@ Remaining / not claimed for this seam:
 Verified after the package-manifest pass:
 
 - Added `src/report_foundry/research_intake.py` with `ResearchIntake`, `ResearchRequest`, structured claims/sections, validation errors, prompt generation, and `research_intake_to_evidence_pack`.
-- Added `compile-intake` CLI so strict LLM researcher JSON enters the normal EvidencePack -> ReportSpec -> package manifest -> renderer pipeline.
-- Added `research-intake-prompt` CLI to emit the schema-only system prompt for the researcher.
+- Added `compile-intake` CLI so strict authored ResearchIntake JSON enters the normal EvidencePack -> ReportSpec -> package manifest -> renderer pipeline.
+- Added `research-intake-prompt` CLI to emit the schema-only authoring prompt.
 - The prompt requires the full report to live inside JSON fields and forbids prose outside the JSON object.
 - Tests assert the prompt/schema contain no prefilled topic, URL, source ID, fact ID, claim ID, SpaceX/IPO-style drift, or example source.
 - Tests assert valid intake converts to `EvidencePack`, and unknown source/fact/claim support fails closed before rendering.
 
 Remaining / not claimed for this seam:
 
-- No live LLM/deep-research provider call is wired yet. This is the deterministic intake law and software bridge.
-- No automatic source fetching/hashing adapter is implemented in this seam; the LLM/intake payload must supply observed source metadata.
+- No live model/deep-research provider call is wired yet. This is the deterministic intake law and software bridge.
+- No automatic source fetching/hashing adapter is implemented in this seam; the ResearchIntake payload must supply observed source metadata.
 - Prompt evaluation against real model outputs is still future work.
 
 ## Suggested run package structure
@@ -917,7 +909,7 @@ Remaining / not claimed for this seam:
   rubric.json
   source_plan.json
   visual_plan.json
-  worker_plan.json
+  execution_plan.json
   connector_result.json
   research_run_log.json
   observed_sources/
@@ -986,21 +978,21 @@ Why first:
 
 - It proves Foundry can wrap external tools without depending on them yet.
 - It resolves fixture/product ambiguity.
-- It gives a stable target for GPT Researcher/STORM/PaperQA adapters.
+- It gives a stable target for external research-system adapters.
 
 ## Phase 2 — First real adapter
 
 Pick one:
 
-- **GPT Researcher** if the goal is broad web/deep-research reports.
+- **external research-system** if the goal is broad web/deep-research reports.
 - **PaperQA** if the goal is scientific/literature report credibility.
-- **STORM** if the goal is outline/perspective-rich knowledge curation.
+- An outline-first adapter if the goal is perspective-rich knowledge curation.
 
-Recommendation: start with **GPT Researcher ingestion**, because it most closely matches general report generation and already has report/source outputs. Keep adapter ingest-only at first; do not embed it as a hard dependency.
+Recommendation: start with **external research-system ingestion**, because it most closely matches general report generation and already has report/source outputs. Keep adapter ingest-only at first; do not embed it as a hard dependency.
 
 Build:
 
-1. Parse GPT Researcher output/source list into `ConnectorResult`.
+1. Parse external research-system output/source list into `ConnectorResult`.
 2. Convert selected sources to `SourceObservation`.
 3. Preserve raw output path under run package.
 4. Extract claims only through Foundry normalization, not by trusting the report prose.
@@ -1071,7 +1063,7 @@ Test count must not decrease.
 
 ## No provider leakage
 
-Core contracts must not import GPT Researcher, STORM, PaperQA, Pandoc, Typst, or Playwright-specific objects. Those live behind adapters.
+Core contracts must not import external research-system, citation-tool, renderer, or browser-engine-specific objects. Those live behind adapters.
 
 Bad:
 
@@ -1093,7 +1085,7 @@ class ConnectorResult(BaseModel):
 Never add fields named or shaped like:
 
 ```text
-api_key
+credential handle
 secret
 token
 password
@@ -1109,7 +1101,7 @@ provider_ref
 
 ## Artifacts over hidden state
 
-If a step matters, it writes an artifact. Internal agent memory is not an audit trail.
+If a step matters, it writes an artifact. Internal model/session memory is not an audit trail.
 
 ## Gate failures route backward
 
@@ -1121,20 +1113,20 @@ Do not convert gate errors into warnings just to make a demo pass. If a product 
 
 These need operator choice before implementation beyond Phase 1:
 
-1. **First real adapter:** GPT Researcher, STORM, PaperQA, or MCP/internal source?
+1. **First real adapter:** external research system, document-QA adapter, or internal source?
 2. **First product report class:** executive/current-events brief, investor memo, scientific literature review, or internal knowledge report?
 3. **Renderer priority:** Typst first, or formalize Playwright and add visual QA first?
 4. **Citation engine:** Python-only CSL/BibTeX export first, or Node-based Citation.js/citeproc integration?
-5. **Workflow runner:** simple local CLI sequence first, Hermes subagents, or a durable queue/server?
+5. **Workflow runner:** simple local CLI sequence first, a durable queue/server, or another external runner?
 
 Default recommendation:
 
 ```text
 Phase 1: RunMode + ConnectorAdapter + FakeConnectorAdapter
-Phase 2: GPT Researcher ingest adapter
+Phase 2: external research-system ingest adapter
 Phase 3: CitationRecord + CSL JSON
 Phase 4: ExhibitSpec + Vega-Lite
 Phase 5: RendererAdapter formalization + Typst spike
 ```
 
-This keeps Foundry focused: not another research agent, but the system that makes research agents safe, inspectable, and publishable.
+This keeps Foundry focused: not another research system, but the toolkit that makes authored research safe, inspectable, and publishable.

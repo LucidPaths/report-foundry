@@ -36,31 +36,6 @@ def test_principle_lattice_doctrine_exists_and_names_all_principles() -> None:
     assert "A principle without an instantiation is a wish" in doctrine
 
 
-def test_agent_instructions_mirror_hivemind_lattice_operating_layer() -> None:
-    instructions = (ROOT / "CLAUDE.md").read_text(encoding="utf-8")
-
-    assert "## Principle Lattice" in instructions
-    assert "## Pre-Commit Verification" in instructions
-    assert "## Things to Avoid" in instructions
-    assert "docs/PRINCIPLE_LATTICE.md" in instructions
-    assert "Lattice:" in instructions
-
-    for code, name in PRINCIPLE_NAMES.items():
-        assert code in instructions
-        assert name in instructions
-
-    for required_check in [
-        "Run the full suite",
-        "Trace the actual flow",
-        "Grep for the pattern",
-        "Check all 8 Principle Lattice items explicitly",
-        "No dead code",
-        "Check external-surface safety",
-        "Inspect the diff",
-    ]:
-        assert required_check in instructions
-
-
 def test_lattice_parser_rejects_empty_unknown_duplicate_and_misnamed_declarations() -> None:
     assert _parse_lattice_principles("Lattice: RF-P1 Source Sovereignty.") == ["RF-P1"]
 

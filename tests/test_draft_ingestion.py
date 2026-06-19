@@ -1,4 +1,4 @@
-"""LLM-authored markdown draft ingestion tests.
+"""Authored markdown draft ingestion tests.
 
 Lattice: RF-P1 Source Sovereignty; RF-P2 Claim Traceability; RF-P4 Gates Fail Closed; RF-P6 Visuals Are Claims; RF-P8 Low Floor, High Ceiling.
 """
@@ -18,7 +18,7 @@ runner = CliRunner()
 
 DRAFT = """# AI Infrastructure Debt Is Becoming a Bank Underwriting Problem
 
-LLM-authored reports should arrive as real prose, not as a tiny coded sample. This opening paragraph is written by the research worker and must survive into the rendered report body.
+Authored reports should arrive as real prose, not as a tiny coded sample. This opening paragraph is written by the research fixture and must survive into the rendered report body.
 
 :::source
 id: src_bis_ai_risk
@@ -56,15 +56,15 @@ The evidence claim above should become a supported claim in the Foundry output, 
 
 ## The design path is software composition, not PDF handcrafting
 
-The LLM writes this report and chooses the graph intent. The Foundry parses the prose, validates the cited source, renders the diagram, lays out the document, emits metrics, and produces page previews for QA.
+The report author writes this report and chooses the graph intent. The Foundry parses the prose, validates the cited source, renders the diagram, lays out the document, emits metrics, and produces page previews for QA.
 """
 
 
-def test_parse_markdown_draft_preserves_llm_written_report_and_exhibit_contract() -> None:
-    pack = parse_markdown_draft(DRAFT, author="Research LLM")
+def test_parse_markdown_draft_preserves_authored_written_report_and_exhibit_contract() -> None:
+    pack = parse_markdown_draft(DRAFT, author="Research Author")
 
     assert pack.title == "AI Infrastructure Debt Is Becoming a Bank Underwriting Problem"
-    assert pack.author == "Research LLM"
+    assert pack.author == "Research Author"
     assert len(pack.report_sections) == 3
     assert "must survive into the rendered report body" in pack.report_sections[0].paragraphs[0]
     assert pack.sources[0].source_id == "src_bis_ai_risk"
@@ -82,26 +82,26 @@ def test_parse_markdown_draft_preserves_llm_written_report_and_exhibit_contract(
     assert "AI infrastructure spend" in visual.plain_text_payload
 
 
-def test_compile_draft_command_turns_llm_markdown_into_foundry_artifacts(tmp_path: Path) -> None:
-    draft_path = tmp_path / "ai_bank_report.md"
+def test_compile_draft_command_turns_authored_markdown_into_foundry_artifacts(tmp_path: Path) -> None:
+    draft_path = tmp_path / "authored_bank_report.md"
     out_dir = tmp_path / "rendered"
     draft_path.write_text(DRAFT, encoding="utf-8")
 
-    result = runner.invoke(app, ["compile-draft", str(draft_path), "--out-dir", str(out_dir), "--author", "Research LLM"])
+    result = runner.invoke(app, ["compile-draft", str(draft_path), "--out-dir", str(out_dir), "--author", "Research Author"])
 
     assert result.exit_code == 0, result.output
-    assert (out_dir / "ai_bank_report.evidence.json").exists()
-    assert (out_dir / "ai_bank_report.spec.json").exists()
-    assert (out_dir / "ai_bank_report.html").exists()
-    assert (out_dir / "ai_bank_report.pdf").exists()
-    assert (out_dir / "ai_bank_report.ai_risk_flow.svg").exists()
-    assert (out_dir / "ai_bank_report.pages" / "page_001.png").exists()
+    assert (out_dir / "authored_bank_report.evidence.json").exists()
+    assert (out_dir / "authored_bank_report.spec.json").exists()
+    assert (out_dir / "authored_bank_report.html").exists()
+    assert (out_dir / "authored_bank_report.pdf").exists()
+    assert (out_dir / "authored_bank_report.ai_risk_flow.svg").exists()
+    assert (out_dir / "authored_bank_report.pages" / "page_001.png").exists()
 
-    evidence = json.loads((out_dir / "ai_bank_report.evidence.json").read_text(encoding="utf-8"))
+    evidence = json.loads((out_dir / "authored_bank_report.evidence.json").read_text(encoding="utf-8"))
     serialized = json.dumps(evidence).lower()
     assert "report foundry oss strategy brief" not in serialized
-    assert evidence["report_sections"][0]["paragraphs"][0].startswith("LLM-authored reports")
+    assert evidence["report_sections"][0]["paragraphs"][0].startswith("Authored reports")
 
-    layout = json.loads((out_dir / "ai_bank_report.layout.json").read_text(encoding="utf-8"))
+    layout = json.loads((out_dir / "authored_bank_report.layout.json").read_text(encoding="utf-8"))
     assert layout["page_count"] >= 1
     assert layout["visual_object_count"] > 0

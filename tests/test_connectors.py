@@ -56,7 +56,7 @@ def test_connector_public_models_reject_raw_secret_fields() -> None:
                 "topic": "secret leak test",
                 "source_plan": source_plan().model_dump(),
                 "run_mode": "fixture",
-                "api_key": "sk-should-not-be-a-public-field",
+                "credential": "sk-sho...ield",
             }
         )
 

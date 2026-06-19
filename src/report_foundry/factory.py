@@ -34,7 +34,6 @@ class Department(str, Enum):
 Severity = Literal["error", "warning"]
 FoundryPipelineStage = Literal[
     "keyword_intake",
-    "ai_search",
     "source_observation",
     "fact_extraction",
     "claim_synthesis",
@@ -43,33 +42,17 @@ FoundryPipelineStage = Literal[
 ]
 
 
-class ConnectedProvider(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    provider: str
-    api_key_env_var: str
-
-    @field_validator("provider", "api_key_env_var")
-    @classmethod
-    def non_empty(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("provider connection fields must not be empty")
-        return value
-
-
 class FoundryRunRequest(BaseModel):
-    """Top-level product intake: user key reference + keyword/topic enters the foundry."""
+    """Top-level product intake: keyword/topic plus optional source namespaces."""
 
     model_config = ConfigDict(extra="forbid")
 
     keyword: str
-    ai: ConnectedProvider
-    search: ConnectedProvider
+    source_namespaces: list[str] = Field(default_factory=list)
     audience: str = "executive readers"
     pipeline: list[FoundryPipelineStage] = Field(
         default_factory=lambda: [
             "keyword_intake",
-            "ai_search",
             "source_observation",
             "fact_extraction",
             "claim_synthesis",
@@ -110,7 +93,7 @@ class ReportRubric(BaseModel):
 class ReportRunManifest(BaseModel):
     topic: str
     rubric: ReportRubric
-    integration_mode: Literal["cli", "mcp", "server", "library"] = "cli"
+    integration_mode: Literal["cli", "server", "library", "adapter"] = "cli"
     connected_sources: list[str] = Field(default_factory=list)
     run_mode: RunMode = RunMode.FIXTURE
 
@@ -141,24 +124,24 @@ class VisualPlan(BaseModel):
     items: list[VisualPlanItem]
 
 
-class WorkerTask(BaseModel):
-    worker_id: str
+class PipelineTask(BaseModel):
+    task_id: str
     department: Department
     task: str
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
-    scratchpad_section: str
+    work_section: str
     depends_on: list[str] = Field(default_factory=list)
-    completion_signal: str = "append scratchpad section and emit worker_complete notification"
-    health_checks: list[str] = Field(default_factory=lambda: ["token_delta_or_file_output", "bounded_runtime"])
+    completion_signal: str = "write expected output artifact"
+    health_checks: list[str] = Field(default_factory=lambda: ["required_outputs_present", "bounded_runtime"])
 
 
-class AutonomyPlan(BaseModel):
+class ExecutionPlan(BaseModel):
     topic: str
-    scratchpad_id: str
+    workspace_id: str
     workspace_policy: Literal["isolated_run_directory"] = "isolated_run_directory"
-    notification_policy: str = "worker completion emits compact status plus scratchpad section pointer"
-    tasks: list[WorkerTask]
+    notification_policy: str = "step completion emits compact status plus output pointers"
+    tasks: list[PipelineTask]
 
 
 class PageMetrics(BaseModel):
@@ -188,7 +171,7 @@ class RunPackage(BaseModel):
     manifest: ReportRunManifest
     source_plan: SourcePlan
     visual_plan: VisualPlan
-    worker_plan: AutonomyPlan
+    execution_plan: ExecutionPlan
     initial_gate_result: FactoryGateResult
 
 
@@ -222,21 +205,10 @@ GENERIC_DIMENSIONS = [
 def build_foundry_run_request(
     *,
     keyword: str,
-    ai_provider: str,
-    ai_api_key_env_var: str,
-    search_provider: str | None = None,
-    search_api_key_env_var: str | None = None,
+    source_namespaces: list[str] | None = None,
     audience: str = "executive readers",
 ) -> FoundryRunRequest:
-    return FoundryRunRequest(
-        keyword=keyword,
-        audience=audience,
-        ai=ConnectedProvider(provider=ai_provider, api_key_env_var=ai_api_key_env_var),
-        search=ConnectedProvider(
-            provider=search_provider or ai_provider,
-            api_key_env_var=search_api_key_env_var or ai_api_key_env_var,
-        ),
-    )
+    return FoundryRunRequest(keyword=keyword, audience=audience, source_namespaces=source_namespaces or [])
 
 
 def build_case_rubric(topic: str, *, audience: str) -> ReportRubric:
@@ -305,58 +277,58 @@ def build_visual_plan(rubric: ReportRubric) -> VisualPlan:
     )
 
 
-def build_autonomy_plan(*, topic: str, source_plan: SourcePlan, visual_plan: VisualPlan) -> AutonomyPlan:
+def build_execution_plan(*, topic: str, source_plan: SourcePlan, visual_plan: VisualPlan) -> ExecutionPlan:
     research_tasks = [
-        WorkerTask(
-            worker_id=f"research-{_slug(item.dimension)}",
+        PipelineTask(
+            task_id=f"research-{_slug(item.dimension)}",
             department=Department.RESEARCH,
             task=(
                 f"Acquire and observe sources for {item.dimension}; extract source-bound facts only when "
                 f"they satisfy the acceptance rule: {item.acceptance_rule}"
             ),
             inputs=["manifest.json", "source_plan.json", f"dimension:{item.dimension}", *item.source_hints],
-            outputs=["source observations", "dimension facts", f"scratchpad:research/{item.dimension}"],
-            scratchpad_section=f"research/{item.dimension}",
+            outputs=["source observations", "dimension facts", f"workspace:research/{item.dimension}"],
+            work_section=f"research/{item.dimension}",
         )
         for item in source_plan.items
     ]
-    research_ids = [task.worker_id for task in research_tasks]
-    synthesis_task = WorkerTask(
-        worker_id="synthesis-claims",
+    research_ids = [task.task_id for task in research_tasks]
+    synthesis_task = PipelineTask(
+        task_id="synthesis-claims",
         department=Department.SYNTHESIS,
-        task="Synthesize hard-hitting claims only from scratchpad facts; preserve fact IDs and uncertainty.",
-        inputs=["manifest.json", "source_plan.json", "scratchpad:research/*"],
+        task="Synthesize hard-hitting claims only from workspace facts; preserve fact IDs and uncertainty.",
+        inputs=["manifest.json", "source_plan.json", "workspace:research/*"],
         outputs=["evidence claims", "evidence_pack.json"],
-        scratchpad_section="synthesis/claims",
+        work_section="synthesis/claims",
         depends_on=research_ids,
     )
     visual_tasks = [
-        WorkerTask(
-            worker_id=f"visuals-{_slug(item.visual_id)}",
+        PipelineTask(
+            task_id=f"visuals-{_slug(item.visual_id)}",
             department=Department.VISUALS,
             task=(
                 f"Design {item.visual_type} '{item.visual_id}' for this purpose: {item.purpose} "
                 f"Acceptance rule: {item.acceptance_rule}"
             ),
-            inputs=["visual_plan.json", "evidence_pack.json", "scratchpad:synthesis/claims"],
-            outputs=["visual specification", f"scratchpad:visuals/{item.visual_id}"],
-            scratchpad_section=f"visuals/{item.visual_id}",
+            inputs=["visual_plan.json", "evidence_pack.json", "workspace:synthesis/claims"],
+            outputs=["visual specification", f"workspace:visuals/{item.visual_id}"],
+            work_section=f"visuals/{item.visual_id}",
             depends_on=["synthesis-claims"],
         )
         for item in visual_plan.items
     ]
-    qa_task = WorkerTask(
-        worker_id="qa-final-gates",
+    qa_task = PipelineTask(
+        task_id="qa-final-gates",
         department=Department.QA,
         task="Run evidence, synthesis, visual provenance, and layout gates; route failures to the earliest responsible department.",
-        inputs=["manifest.json", "evidence_pack.json", "visual_plan.json", "scratchpad:visuals/*"],
+        inputs=["manifest.json", "evidence_pack.json", "visual_plan.json", "workspace:visuals/*"],
         outputs=["research_gate_result.json", "final_gate_result.json"],
-        scratchpad_section="qa/final-gates",
-        depends_on=[task.worker_id for task in visual_tasks] or ["synthesis-claims"],
+        work_section="qa/final-gates",
+        depends_on=[task.task_id for task in visual_tasks] or ["synthesis-claims"],
     )
-    return AutonomyPlan(
+    return ExecutionPlan(
         topic=topic,
-        scratchpad_id=f"report-foundry-{_slug(topic)}",
+        workspace_id=f"report-foundry-{_slug(topic)}",
         tasks=[*research_tasks, synthesis_task, *visual_tasks, qa_task],
     )
 
@@ -366,7 +338,7 @@ def write_run_package(
     topic: str,
     audience: str,
     out_dir: Path,
-    integration_mode: Literal["cli", "mcp", "server", "library"] = "cli",
+    integration_mode: Literal["cli", "server", "library", "adapter"] = "cli",
     connected_sources: list[str] | None = None,
     run_mode: RunMode = RunMode.FIXTURE,
 ) -> RunPackage:
@@ -380,7 +352,7 @@ def write_run_package(
     )
     source_plan = build_source_plan(rubric)
     visual_plan = build_visual_plan(rubric)
-    worker_plan = build_autonomy_plan(topic=topic, source_plan=source_plan, visual_plan=visual_plan)
+    execution_plan = build_execution_plan(topic=topic, source_plan=source_plan, visual_plan=visual_plan)
     empty_evidence = EvidencePack(title=topic, scope={"status": "planning_only_no_sources_observed_yet", "run_mode": run_mode.value, "artifact_status": _artifact_status(run_mode)})
     initial_gate_result = evaluate_factory_gates(
         manifest,
@@ -393,9 +365,9 @@ def write_run_package(
     _write_json(out_dir / "rubric.json", rubric)
     _write_json(out_dir / "source_plan.json", source_plan)
     _write_json(out_dir / "visual_plan.json", visual_plan)
-    _write_json(out_dir / "worker_plan.json", worker_plan)
+    _write_json(out_dir / "execution_plan.json", execution_plan)
     _write_json(out_dir / "initial_gate_result.json", initial_gate_result)
-    return RunPackage(run_dir=out_dir, manifest=manifest, source_plan=source_plan, visual_plan=visual_plan, worker_plan=worker_plan, initial_gate_result=initial_gate_result)
+    return RunPackage(run_dir=out_dir, manifest=manifest, source_plan=source_plan, visual_plan=visual_plan, execution_plan=execution_plan, initial_gate_result=initial_gate_result)
 
 
 def evaluate_factory_gates(manifest: ReportRunManifest, evidence: EvidencePack, *, pages: list[PageMetrics]) -> FactoryGateResult:

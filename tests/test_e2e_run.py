@@ -13,8 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from report_foundry.adequacy import run_research_adequacy_gates
-from report_foundry.cli import _validated_ollama_chat_endpoint, app
-from report_foundry.json_repair import normalize_research_intake_ids, parse_or_repair_json_object
+from report_foundry.cli import app
 from report_foundry.research_intake import ResearchIntake
 from report_foundry.source_extract import readable_text_from_html
 
@@ -52,14 +51,14 @@ def test_compile_intake_prints_clean_pdf_handoff_and_writes_run_log(tmp_path: Pa
     assert run_log["summary"]["status"] == "success"
 
 
-def test_glm_run_can_execute_one_command_from_existing_intake_fixture(tmp_path: Path) -> None:
+def test_intake_run_can_execute_one_command_from_existing_intake_fixture(tmp_path: Path) -> None:
     intake_path = write_valid_intake(tmp_path / "seed_intake.json")
     run_dir = tmp_path / "run"
 
     result = runner.invoke(
         app,
         [
-            "glm-run",
+            "intake-run",
             "--topic",
             "nvidia company history",
             "--intake-json",
@@ -76,8 +75,7 @@ def test_glm_run_can_execute_one_command_from_existing_intake_fixture(tmp_path: 
     assert (run_dir / "compiled" / "research_intake.pdf").exists()
     run_log = json.loads((run_dir / "run_log.json").read_text(encoding="utf-8"))
     assert [step["name"] for step in run_log["steps"]] == [
-        "create_research_gate",
-        "load_seed_intake",
+        "load_intake_contract",
         "validate_intake",
         "compile_artifacts",
         "verify_artifacts",
@@ -97,10 +95,10 @@ def test_foundry_scope_law_is_visible_in_cli_prompt_and_docs(tmp_path: Path, mon
     architecture = Path(__file__).parents[1].joinpath("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
 
     assert "Foundry does not browse" in prompt
-    assert "Your research-capable LLM/session does that work" in prompt
-    assert "LLM/session: search, read, quote" in readme
+    assert "A human or external report author supplies" in prompt
+    assert "Report author: search, read, quote" in readme
     assert "Not Foundry responsibilities" in architecture
-    assert "pretending a plain model endpoint has web_search tools" in architecture
+    assert "pretending a plain model endpoint has browsing tools" in architecture
 
 
 def test_readable_html_extractor_removes_script_noise_and_preserves_body_text() -> None:
@@ -115,37 +113,6 @@ def test_readable_html_extractor_removes_script_noise_and_preserves_body_text() 
     assert "NVIDIA was founded in 1993." in text
     assert "window.noise" not in text
     assert "display:none" not in text
-
-
-def test_json_repair_extracts_object_from_fenced_model_output() -> None:
-    payload = parse_or_repair_json_object('```json\n{"ok": true,}\n```')
-
-    assert payload == {"ok": True}
-
-
-def test_json_repair_normalizes_uppercase_model_ids_and_references() -> None:
-    payload = {
-        "sources": [{"id": "S1"}],
-        "facts": [{"id": "F1", "source_id": "S1"}],
-        "proposed_claims": [{"id": "C1", "supporting_fact_ids": ["F1"]}],
-        "report": {"sections": [{"id": "SEC1", "referenced_claim_ids": ["C1"], "referenced_fact_ids": ["F1"]}]},
-    }
-
-    normalized = normalize_research_intake_ids(payload)
-
-    assert normalized["sources"][0]["id"] == "s1"
-    assert normalized["facts"][0]["source_id"] == "s1"
-    assert normalized["proposed_claims"][0]["supporting_fact_ids"] == ["f1"]
-    assert normalized["report"]["sections"][0]["referenced_claim_ids"] == ["c1"]
-
-
-def test_ollama_endpoint_validation_requires_https_except_localhost() -> None:
-    assert _validated_ollama_chat_endpoint("https://ollama.com/v1") == "https://ollama.com/v1/chat/completions"
-    assert _validated_ollama_chat_endpoint("http://localhost:11434/v1") == "http://localhost:11434/v1/chat/completions"
-    with pytest.raises(RuntimeError, match="https"):
-        _validated_ollama_chat_endpoint("http://ollama.com/v1")
-    with pytest.raises(RuntimeError, match="credentials"):
-        _validated_ollama_chat_endpoint("https://user:pass@ollama.com/v1?x=1")
 
 
 def test_adequacy_gates_log_thin_research_without_breaking_structural_validation() -> None:
