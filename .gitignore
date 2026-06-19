@@ -6,4 +6,9 @@ build/
 *.egg-info/
 .output/
 .output_*/
+.foundry_runs/
+.foundry_*/
+.verify_tmp/
+foundry_verify_*/
+.hermes/
 .DS_Store

@@ -44,6 +44,38 @@ Outputs:
 .output/daily_systems_brief.pdf
 ```
 
+## One-command research-intake smoke loop
+
+Use `glm-run` for end-to-end Foundry verification. It creates a research gate
+package, obtains or loads a `ResearchIntake`, validates it, compiles artifacts,
+runs artifact QA, and ends with a clean user handoff.
+
+```bash
+uv run reportfoundry glm-run \
+  --topic "nvidia company history" \
+  --intake-json path/to/research_intake.json \
+  --out-dir .foundry_runs/nvidia-history
+```
+
+Successful output is intentionally sanitized:
+
+```text
+Here is your PDF
+research intake: compiled
+pdf: .foundry_runs/nvidia-history/compiled/research_intake.pdf
+html: .foundry_runs/nvidia-history/compiled/research_intake.html
+package manifest: .foundry_runs/nvidia-history/compiled/research_intake.package_manifest.json
+run log: .foundry_runs/nvidia-history/run_log.json
+```
+
+Each run writes structured logs with step names, timings, statuses, adequacy
+warnings, artifact QA checks, and artifact paths. Live GLM execution uses the
+OpenAI-compatible Ollama endpoint when `OLLAMA_API_KEY` is present; deterministic
+CI/local tests should pass `--intake-json`.
+
+Scratch run directories are ignored by git via `.foundry_runs/`, `.foundry_*/`,
+`.verify_tmp/`, and `foundry_verify_*/`.
+
 ## Foundry run shape
 
 The real product run starts when a user connects their own AI/search provider key and submits a keyword/topic. The key is referenced through environment/config; raw secrets are not stored in run manifests.

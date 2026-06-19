@@ -104,11 +104,41 @@ class PandocRendererAdapter:
         raise RendererRouteError("pandoc renderer not implemented", gate)
 
 
+class WeasyPrintRendererAdapter:
+    route = "weasyprint"
+
+    def render(self, request: RenderRequest) -> RenderArtifact:
+        if shutil.which("weasyprint") is None:
+            gate = _write_gate(request, [QualityCheck(code="renderer_unavailable", message="weasyprint binary unavailable on PATH.")])
+            raise RendererRouteError("weasyprint renderer unavailable", gate)
+        gate = _write_gate(request, [QualityCheck(code="renderer_unavailable", message="weasyprint route is scaffolded but not implemented yet.")])
+        raise RendererRouteError("weasyprint renderer not implemented", gate)
+
+
+class KaleidoRendererAdapter:
+    route = "kaleido"
+
+    def render(self, request: RenderRequest) -> RenderArtifact:
+        gate = _write_gate(request, [QualityCheck(code="renderer_unavailable", message="kaleido is a chart export adapter, not a full report renderer yet.")])
+        raise RendererRouteError("kaleido renderer not implemented", gate)
+
+
+class CslRendererAdapter:
+    route = "csl"
+
+    def render(self, request: RenderRequest) -> RenderArtifact:
+        gate = _write_gate(request, [QualityCheck(code="renderer_unavailable", message="csl/citeproc is a citation adapter, not a full report renderer yet.")])
+        raise RendererRouteError("csl renderer not implemented", gate)
+
+
 def render_with_route(request: RenderRequest) -> RenderArtifact:
     adapters: dict[str, RendererAdapter] = {
         PlaywrightChromiumRendererAdapter.route: PlaywrightChromiumRendererAdapter(),
         TypstRendererAdapter.route: TypstRendererAdapter(),
         PandocRendererAdapter.route: PandocRendererAdapter(),
+        WeasyPrintRendererAdapter.route: WeasyPrintRendererAdapter(),
+        KaleidoRendererAdapter.route: KaleidoRendererAdapter(),
+        CslRendererAdapter.route: CslRendererAdapter(),
     }
     adapter = adapters.get(request.route)
     if adapter is None:
